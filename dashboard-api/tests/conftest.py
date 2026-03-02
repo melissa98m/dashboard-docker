@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 # Use temp DB for tests (before app imports config)
 os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/dashboard_test.db")
 os.environ.setdefault("ALERT_ENGINE_ENABLED", "false")
+os.environ.setdefault("EVENT_WATCHER_ENABLED", "false")
 os.environ.setdefault("AUDIT_RETENTION_AUTO_ENABLED", "false")
 os.environ.setdefault("COMMAND_EXECUTION_RETENTION_AUTO_ENABLED", "false")
 

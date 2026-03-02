@@ -16,6 +16,7 @@ from app.services.alert_engine import AlertEngine
 from app.services.audit_retention import AuditRetentionService
 from app.services.auth_session_retention import AuthSessionRetentionService
 from app.services.command_retention import CommandRetentionService
+from app.services.event_watcher import EventWatcherService
 
 
 @asynccontextmanager
@@ -24,15 +25,18 @@ async def lifespan(app: FastAPI):
     ensure_bootstrap_admin()
     apply_runtime_settings(overrides=list_runtime_settings())
     app.state.alert_engine = AlertEngine()
+    app.state.event_watcher = EventWatcherService()
     app.state.audit_retention_service = AuditRetentionService()
     app.state.auth_session_retention_service = AuthSessionRetentionService()
     app.state.command_retention_service = CommandRetentionService()
     app.state.alert_engine.start()
+    app.state.event_watcher.start()
     app.state.audit_retention_service.start()
     app.state.auth_session_retention_service.start()
     app.state.command_retention_service.start()
     yield
     app.state.alert_engine.stop()
+    app.state.event_watcher.stop()
     app.state.audit_retention_service.stop()
     app.state.auth_session_retention_service.stop()
     app.state.command_retention_service.stop()

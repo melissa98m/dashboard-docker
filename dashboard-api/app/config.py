@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     sse_max_connections: int = 20
     alert_engine_enabled: bool = True
     alert_poll_seconds: int = 10
+    event_watcher_enabled: bool = True
+    event_watcher_ntfy_topic: str | None = None
     ntfy_base_url: str | None = None
     ntfy_topic: str | None = None
     public_api_url: str | None = None
