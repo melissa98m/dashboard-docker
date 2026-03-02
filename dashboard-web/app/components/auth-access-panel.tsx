@@ -2,54 +2,27 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-import {
-  ApiClientError,
-  apiFetch,
-  apiJson,
-  getAuthEventName,
-} from "../lib/api-client";
+import { ApiClientError, apiFetch, getAuthEventName } from "../lib/api-client";
+import { useAuth } from "../contexts/auth-context";
 
 interface AuthErrorDetail {
   status: number;
   message: string;
 }
 
-interface AuthMeResponse {
-  authenticated: boolean;
-  username: string;
-  role: string;
-}
-
 export default function AuthAccessPanel() {
+  const { me, loading, refreshAuthState, registerOpenAuthPanel } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [me, setMe] = useState<AuthMeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<AuthErrorDetail | null>(null);
 
-  const refreshAuthState = async (): Promise<void> => {
-    try {
-      const response = await apiJson<AuthMeResponse>("/api/auth/me");
-      setMe(response);
-      setAuthError(null);
-    } catch (error) {
-      if (error instanceof ApiClientError && error.status === 401) {
-        setMe(null);
-      } else if (error instanceof Error) {
-        setAuthError({ status: 0, message: error.message });
-      } else {
-        setAuthError({ status: 0, message: "Erreur d'authentification" });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    return registerOpenAuthPanel(() => setIsOpen(true));
+  }, [registerOpenAuthPanel]);
 
   useEffect(() => {
-    void refreshAuthState();
-
     const onAuthError = (event: Event) => {
       const custom = event as CustomEvent<AuthErrorDetail>;
       const detail = custom.detail;
@@ -70,6 +43,7 @@ export default function AuthAccessPanel() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
+    setAuthError(null);
     try {
       await apiFetch("/api/auth/login", {
         method: "POST",
@@ -77,8 +51,7 @@ export default function AuthAccessPanel() {
         body: JSON.stringify({ username: username.trim(), password }),
       });
       setPassword("");
-      await refreshAuthState();
-      setIsOpen(false);
+      window.location.reload();
     } catch (error) {
       if (error instanceof ApiClientError) {
         setAuthError({ status: error.status, message: error.message });
@@ -96,8 +69,8 @@ export default function AuthAccessPanel() {
     setSubmitting(true);
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
+      await refreshAuthState();
     } finally {
-      setMe(null);
       setSubmitting(false);
       setIsOpen(false);
     }
