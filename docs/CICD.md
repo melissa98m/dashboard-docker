@@ -8,11 +8,12 @@
 
 ## Workflows
 
-| Workflow       | Fichier                          | Déclencheur                          |
-|----------------|-----------------------------------|--------------------------------------|
-| CI             | `.github/workflows/ci.yml`        | Push + PR sur `main`                 |
-| PR Auto-Create | `.github/workflows/pr-auto-create.yml` | Push sur branches hors `main` + `workflow_dispatch` |
-| Deploy         | `.github/workflows/deploy.yml`    | Push sur `main` + `workflow_dispatch` |
+| Workflow         | Fichier                            | Déclencheur                     |
+|------------------|-------------------------------------|---------------------------------|
+| CI               | `.github/workflows/ci.yml`          | Push + PR sur `main`            |
+| PR Auto-Create   | `.github/workflows/pr-auto-create.yml` | Push branches hors `main`      |
+| Auto Pull Request| `.github/workflows/auto-pull-request.yml` | Push branches hors `main`/`master` |
+| Deploy           | `.github/workflows/deploy.yml`      | Push sur `main` + `workflow_dispatch` |
 
 ## CI
 
@@ -30,6 +31,14 @@ Workflow séparé qui s'exécute sur chaque push vers une branche autre que `mai
 3. **Mise à jour** : chaque push sur la branche met automatiquement à jour la PR (comportement natif GitHub)
 
 Utilise le `GITHUB_TOKEN` fourni par Actions ; aucun secret additionnel requis.
+
+## Auto Pull Request
+
+Workflow qui crée ou met à jour une PR (corps = messages de commit) à chaque push sur une branche hors `main`/`master`.
+
+**Si erreur 403** (« GitHub Actions is not permitted to create pull requests ») :
+1. Crée un Personal Access Token avec scope `repo` : https://github.com/settings/tokens
+2. Ajoute le secret `REPO_ACCESS_TOKEN` dans **Settings → Secrets → Actions**
 
 ## Déploiement sur Raspberry Pi
 
@@ -52,6 +61,7 @@ Utilise le `GITHUB_TOKEN` fourni par Actions ; aucun secret additionnel requis.
 | `DEPLOY_HOST`    | IP ou hostname du Pi (ex. `192.168.1.10` ou `pi.local`) |
 | `DEPLOY_USER`    | Utilisateur SSH (ex. `pi`)                       |
 | `DEPLOY_PATH`    | Chemin du projet sur le Pi (ex. `/home/pi/docker-dashboard`) |
+| `REPO_ACCESS_TOKEN` | *(optionnel)* PAT scope `repo` pour Auto Pull Request si 403 |
 
 ### Génération de la clé SSH
 

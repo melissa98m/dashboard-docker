@@ -1,3 +1,6 @@
+# Auto Pull Request — crée/met à jour une PR à chaque push sur une branche.
+# Si le dépôt restreint GITHUB_TOKEN (403), ajoute un PAT dans Settings → Secrets :
+#   REPO_ACCESS_TOKEN = token avec scope "repo" (https://github.com/settings/tokens)
 name: Auto Pull Request
 
 on:
@@ -18,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Install jq
         run: |
@@ -80,7 +83,7 @@ jobs:
       - name: Check if PR exists
         id: check-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           BASE_BRANCH="${{ steps.base.outputs.base_branch }}"
@@ -88,7 +91,7 @@ jobs:
           OWNER="${{ github.repository_owner }}"
 
           PR_RESPONSE=$(curl -s \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO/pulls?head=$OWNER:$BRANCH_NAME&base=$BASE_BRANCH&state=open")
 
@@ -106,7 +109,7 @@ jobs:
       - name: Create Pull Request
         if: steps.check-pr.outputs.pr_exists == 'false'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           BASE_BRANCH="${{ steps.base.outputs.base_branch }}"
@@ -123,7 +126,7 @@ jobs:
             '{title:$title, head:$head, base:$base, body:$body}')
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/$REPO/pulls" \
@@ -144,7 +147,7 @@ jobs:
       - name: Update Pull Request
         if: steps.check-pr.outputs.pr_exists == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER="${{ steps.check-pr.outputs.pr_number }}"
           BASE_BRANCH="${{ steps.base.outputs.base_branch }}"
@@ -172,7 +175,7 @@ jobs:
           UPDATE_DATA=$(jq -n --argjson body "$BODY_JSON" '{body:$body}')
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER" \
