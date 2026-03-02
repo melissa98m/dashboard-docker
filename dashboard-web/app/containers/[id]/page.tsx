@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiJson, streamSse } from "../../lib/api-client";
 import {
-  HISTORY_LENGTH,
+  STATS_RANGE_OPTIONS,
   StatsCharts,
   type StatsDataPoint,
+  type StatsRangeId,
 } from "./components/stats-charts";
 
 interface ContainerDetail {
@@ -48,9 +49,13 @@ export default function ContainerDetailPage({
     memory_percent: 0,
   });
   const [statsHistory, setStatsHistory] = useState<StatsDataPoint[]>([]);
+  const [statsRange, setStatsRange] = useState<StatsRangeId>("2m");
   const [error, setError] = useState<string | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const containerId = useMemo(() => params.id, [params.id]);
+  const lastSampleTsRef = useRef<number>(0);
+  const statsRangeRef = useRef(statsRange);
+  statsRangeRef.current = statsRange;
 
   useEffect(() => {
     let isMounted = true;
@@ -75,21 +80,29 @@ export default function ContainerDetailPage({
   useEffect(() => {
     setStatsError(null);
     setStatsHistory([]);
+    lastSampleTsRef.current = 0;
     const stop = streamSse(`/api/containers/${encodeURIComponent(containerId)}/stats`, {
       onEvent: (eventType, data) => {
         if (eventType === "stats") {
           const payload = data as StatsPayload;
           setStats(payload);
-          setStatsHistory((prev) => {
-            const point: StatsDataPoint = {
-              ts: Date.now(),
-              cpu_percent: payload.cpu_percent,
-              memory_mb: payload.memory_mb,
-              memory_percent: payload.memory_percent,
-            };
-            const next = [...prev, point];
-            return next.length > HISTORY_LENGTH ? next.slice(-HISTORY_LENGTH) : next;
-          });
+          const rangeConfig = STATS_RANGE_OPTIONS.find((o) => o.id === statsRangeRef.current) ?? STATS_RANGE_OPTIONS[0];
+          const now = Date.now();
+          const elapsedMs = now - lastSampleTsRef.current;
+          const intervalMs = rangeConfig.intervalSec * 1000;
+          if (lastSampleTsRef.current === 0 || elapsedMs >= intervalMs) {
+            lastSampleTsRef.current = now;
+            setStatsHistory((prev) => {
+              const point: StatsDataPoint = {
+                ts: now,
+                cpu_percent: payload.cpu_percent,
+                memory_mb: payload.memory_mb,
+                memory_percent: payload.memory_percent,
+              };
+              const next = [...prev, point];
+              return next.length > rangeConfig.maxPoints ? next.slice(-rangeConfig.maxPoints) : next;
+            });
+          }
         }
       },
       onError: (err) => setStatsError(err.message),
@@ -153,6 +166,8 @@ export default function ContainerDetailPage({
             <StatsCharts
               data={statsHistory}
               isRunning={detail.status === "running"}
+              range={statsRange}
+              onRangeChange={setStatsRange}
             />
           </>
         )}
