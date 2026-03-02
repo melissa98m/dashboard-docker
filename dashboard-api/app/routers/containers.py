@@ -8,7 +8,7 @@ import time
 from collections import deque
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import docker
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -98,17 +98,17 @@ def _container_image_ref(container: Any) -> str:
     """Best-effort image reference fallback for missing image metadata."""
     try:
         if container.image.tags:
-            return container.image.tags[0]
-        return container.image.short_id
+            return str(container.image.tags[0])
+        return str(container.image.short_id)
     except docker.errors.DockerException:
         attrs = getattr(container, "attrs", {}) or {}
         config = attrs.get("Config", {}) if isinstance(attrs, dict) else {}
         configured_image = config.get("Image")
         image_id = attrs.get("Image")
         if isinstance(configured_image, str) and configured_image.strip():
-            return configured_image
+            return str(configured_image)
         if isinstance(image_id, str) and image_id.strip():
-            return image_id[:24]
+            return str(image_id[:24])
         logger.warning("Container image metadata unavailable for %s", container.short_id)
         return "unknown"
 
@@ -153,9 +153,11 @@ def _last_down_reason(state: dict[str, Any]) -> str | None:
     if isinstance(exit_code, int):
         if exit_code != 0:
             return f"exit_code_{exit_code}"
-        if status in {"exited", "dead"}:
+        if status in {"exited", "dead"} and isinstance(status, str):
             return status
-    return status if isinstance(status, str) and status.strip() else None
+    if isinstance(status, str) and status.strip():
+        return cast(str, status)
+    return None
 
 
 def _snapshot_logs(container: Any, *, tail: int) -> list[str]:

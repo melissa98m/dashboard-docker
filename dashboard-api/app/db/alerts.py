@@ -79,7 +79,7 @@ def create_rule(
                 now,
             ),
         )
-        rule_id = int(cur.lastrowid)
+        rule_id = int(cur.lastrowid or 0)
         row = conn.execute(
             """
             SELECT id, container_id, container_name, metric_type, threshold,

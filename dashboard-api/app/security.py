@@ -7,6 +7,7 @@ import json
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal, cast
 
 from fastapi import Header, HTTPException, Request, Response, status
 
@@ -28,10 +29,10 @@ class AuthContext:
     session_token: str | None = None
 
 
-def _normalize_samesite(value: str) -> str:
+def _normalize_samesite(value: str) -> Literal["lax", "strict", "none"]:
     normalized = value.strip().lower()
     if normalized in {"strict", "none", "lax"}:
-        return normalized
+        return cast(Literal["lax", "strict", "none"], normalized)
     return "lax"
 
 

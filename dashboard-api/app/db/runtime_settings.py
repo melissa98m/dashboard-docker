@@ -2,7 +2,7 @@
 
 import sqlite3
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from app.config import settings
 from app.db.init import get_db_path
@@ -66,7 +66,9 @@ def list_runtime_settings() -> dict[str, RuntimeSettingValue]:
         key = str(row["key"])
         if key not in ALLOWED_RUNTIME_SETTINGS:
             continue
-        parsed[key] = _deserialize_value(key=key, value=str(row["value"]))
+        parsed[cast(RuntimeSettingKey, key)] = _deserialize_value(
+            key=cast(RuntimeSettingKey, key), value=str(row["value"])
+        )
     return parsed
 
 

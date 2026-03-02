@@ -299,7 +299,7 @@ def patch_runtime_settings(
     if typed_updates:
         previous_values = {key: str(getattr(settings, key)) for key in typed_updates}
         upsert_runtime_settings(values=typed_updates, actor=actor)
-        apply_runtime_settings(overrides=typed_updates)
+        apply_runtime_settings(overrides=cast(dict[str, int | bool], typed_updates))
         _sync_runtime_services(request)
         new_values = {key: str(getattr(settings, key)) for key in typed_updates}
         write_audit_log(
