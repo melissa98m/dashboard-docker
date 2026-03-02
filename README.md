@@ -26,6 +26,7 @@ make up
 | `make dev` | Mode dev avec logs en direct (pas de détachement) |
 | `make logs` | Affiche les logs |
 | `make lint` | Lint API + web |
+| `make lint-ci` | Lint mode CI (sans services démarrés) |
 | `make format` | Formatage du code |
 | `make test` | Tests API + web |
 | `make test-ci` | Tests mode CI (fail-fast, sortie concise) |
@@ -71,6 +72,15 @@ Contraintes du mot de passe : minimum 12 caractères, avec lettres et chiffres.
 - **Base de données** : SQLite
 - **Docker** : socket Unix uniquement (non exposé)
 
+## PWA (installation sur mobile)
+
+L'application est une PWA (Progressive Web App). Sur téléphone, ouvre l'URL du dashboard (ex. `http://<ip-du-pi>:3000`) dans Chrome/Edge/Safari, puis :
+
+- **Chrome/Edge** : Menu (⋮) → « Installer l’application » ou « Ajouter à l’écran d’accueil »
+- **Safari (iOS)** : Partager → « Sur l’écran d’accueil »
+
+Le dashboard s’ouvre alors en plein écran, sans barre d’adresse, comme une app native.
+
 ## Sécurité
 
 - Socket Docker non exposé publiquement
@@ -80,7 +90,7 @@ Contraintes du mot de passe : minimum 12 caractères, avec lettres et chiffres.
 - Limite de flux live SSE configurable (`SSE_MAX_CONNECTIONS`)
 - Lien de restart signé (TTL court) dans les notifications: configurer `API_SECRET_KEY` + `PUBLIC_API_URL`
 
-Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SPEC.md](docs/SPEC.md) et [docs/AUTH_OPERATIONS.md](docs/AUTH_OPERATIONS.md).
+Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SPEC.md](docs/SPEC.md), [docs/AUTH_OPERATIONS.md](docs/AUTH_OPERATIONS.md) et [docs/CICD.md](docs/CICD.md) (CI/CD).
 
 ## Données persistantes (utilisateurs, etc.)
 
