@@ -180,6 +180,21 @@ export default function ContainerDetailPage({
         <p>Health: {detail.health_status ?? "—"}</p>
       </section>
 
+      {detail.status !== "running" && detail.last_logs.length > 0 && (
+        <section className="panel">
+          <h2 className="font-semibold mb-2">Derniers logs (avant arrêt)</h2>
+          <pre className="text-xs overflow-x-auto max-h-48 overflow-y-auto rounded bg-slate-900 p-3 font-mono text-slate-300 whitespace-pre-wrap break-words">
+            {detail.last_logs.join("\n")}
+          </pre>
+          <Link
+            href={`/containers/${encodeURIComponent(containerId)}/logs`}
+            className="text-xs text-sky-400 hover:underline mt-2 inline-block"
+          >
+            Voir tous les logs →
+          </Link>
+        </section>
+      )}
+
       <section className="panel">
         <h2 className="font-semibold mb-2">Fonctionnalites associees</h2>
         <div className="grid gap-3">
