@@ -1,0 +1,43 @@
+services:
+  dashboard-api:
+    build:
+      context: .
+      dockerfile: dashboard-api/Dockerfile
+    container_name: dashboard-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - dashboard-data:/data
+    environment:
+      - DATABASE_URL=sqlite:////data/dashboard.db
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  dashboard-web:
+    build:
+      context: .
+      dockerfile: dashboard-web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: dashboard-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      dashboard-api:
+        condition: service_healthy
+
+volumes:
+  dashboard-data:

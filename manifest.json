@@ -1,0 +1,10 @@
+﻿{
+    "kit":  "vibe-coding-llm-kit",
+    "contains":  [
+                     ".cursor/rules/*.mdc",
+                     "docs/{DEV,SPEC,DOD,ARCHITECTURE,SECURITY,RGPD,SNIPPETS}.md",
+                     "README.md"
+                 ],
+    "generated_at":  "2026-02-27T21:01:35.1554034+01:00"
+}
+
