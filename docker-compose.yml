@@ -1,3 +1,5 @@
+name: docker-dashboard
+
 services:
   dashboard-api:
     build:
