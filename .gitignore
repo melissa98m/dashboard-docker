@@ -1,0 +1,15 @@
+.env
+*.db
+data/
+backups/
+__pycache__/
+.venv/
+node_modules/
+.next/
+.DS_Store
+.cursor/rules/00-core-vibe-coding.mdc
+.gitignore
+.cursor/rules/10-security-rgpd.mdc
+.cursor/rules/05-docker-dashboard.mdc
+.cursor/rules/20-quality-tests-docs.mdc
+.cursor/rules/30-frontend-seo-i18n-perf.mdc

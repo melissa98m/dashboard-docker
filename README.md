@@ -34,7 +34,7 @@ make up
 | `make purge-audit` | Purge les logs d'audit selon la rétention |
 | `make create-user USERNAME=<nom> [ROLE=viewer|admin]` | Crée un utilisateur (mot de passe saisi en prompt masqué) |
 | `make db-backup` | Sauvegarde SQLite dans `backups/` (services doivent être démarrés) |
-| `make clean` | Arrête les services et purge le cache Docker (ne supprime pas le volume de données) |
+| `make clean` | Arrête les services et purge le cache Docker (ne supprime pas le dossier `./data`) |
 | `make health-check` | Vérifie la santé de l'API (pour cron, Uptime Kuma) via `./scripts/health-check.sh` |
 | `make shell-api` | Shell dans le conteneur API |
 | `make shell-web` | Shell dans le conteneur web |
@@ -94,24 +94,14 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SPEC.md](docs/SPEC.md),
 
 ## Données persistantes (utilisateurs, etc.)
 
-Les utilisateurs et la base SQLite sont stockés dans le volume Docker `docker-dashboard_dashboard-data` (`/data/dashboard.db`). Ils **persistent** entre `make build`, `make up`, `make down` et `make restart`.
+Les utilisateurs et la base SQLite sont stockés dans le **dossier local `./data`** (bind mount). Ils **persistent** entre `make build`, `make up`, `make down` et `make restart` car les données sont sur le disque dans le projet.
 
-Le projet utilise un nom fixe (`name: docker-dashboard` dans docker-compose.yml) pour que le volume reste le même même si vous renommez ou déplacez le dossier.
 
-Si vous devez recréer les utilisateurs après un rebuild (sans `-v`), causes possibles :
+Pour conserver les données : ne pas supprimer `./data` ; sauvegardes via `make db-backup`.
 
-- **`docker compose down -v`** ou **`docker volume prune`** : supprime les volumes
-- **Changement d’environnement** : nouvelle installation Docker, “Reset” Docker Desktop, etc.
-- **Avant cette correction** : l’ancien projet utilisait le nom du dossier ; un dossier renommé = nouveau volume vide
-
-Pour conserver les données :
-
-- Éviter `docker compose down -v` et `docker volume prune`
-- Sauvegardes : `make db-backup`
-
-**Migration** : si vous aviez des données dans l’ancien volume (nom basé sur le dossier), vous pouvez copier la base avant le premier `make up` avec le nouveau nom :
+**Migration depuis un ancien volume Docker** : si vous aviez des données dans `docker-dashboard_dashboard-data` ou `vibe-coding-llm-kit_dashboard-data` :
 
 ```bash
-docker run --rm -v vibe-coding-llm-kit_dashboard-data:/from -v docker-dashboard_dashboard-data:/to alpine cp -a /from/. /to/
+mkdir -p data
+docker run --rm -v docker-dashboard_dashboard-data:/from -v $(pwd)/data:/to alpine cp -a /from/. /to/
 ```
-(adapter le nom de l’ancien volume avec `docker volume ls`)

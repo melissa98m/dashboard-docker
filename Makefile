@@ -6,6 +6,7 @@ build:
 	docker compose build
 
 up:
+	@mkdir -p data
 	docker compose up -d --build
 
 down:

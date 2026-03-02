@@ -27,6 +27,7 @@ jobs:
           rsync -avz --delete \
             --exclude='.env' \
             --exclude='.git' \
+            --exclude='data' \
             --exclude='backups' \
             --exclude='__pycache__' \
             --exclude='node_modules' \

@@ -11,7 +11,7 @@ services:
       - .env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - dashboard-data:/data
+      - ./data:/data
     environment:
       - DATABASE_URL=sqlite:////data/dashboard.db
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -40,6 +40,3 @@ services:
     depends_on:
       dashboard-api:
         condition: service_healthy
-
-volumes:
-  dashboard-data:
