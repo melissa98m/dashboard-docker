@@ -12,6 +12,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - dashboard_data:/data
+      - .:/workspace:rw
     environment:
       - DATABASE_URL=sqlite:////data/dashboard.db
       - DOCKER_HOST=unix:///var/run/docker.sock

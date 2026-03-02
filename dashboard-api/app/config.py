@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     command_execution_retention_auto_enabled: bool = True
     command_execution_retention_poll_seconds: int = 86400
     api_secret_key: str = ""
+    act_enabled: bool = False
+    act_workflows_path: str = "/workspace"
 
 
 settings = Settings()

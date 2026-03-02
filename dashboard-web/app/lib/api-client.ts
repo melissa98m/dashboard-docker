@@ -212,3 +212,70 @@ export function streamSse(pathOrUrl: string, options: SseStreamOptions): () => v
     controller.abort();
   };
 }
+
+/**
+ * POST to an endpoint and stream SSE response. Used for act workflow runs.
+ */
+export function streamSsePost(pathOrUrl: string, body: unknown, options: SseStreamOptions): () => void {
+  const { onEvent, onError, signal } = options;
+  const url = toAbsoluteUrl(pathOrUrl);
+  const controller = new AbortController();
+  const effectiveSignal = signal || controller.signal;
+
+  let mounted = true;
+
+  (async () => {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: buildHeaders({ headers: { "Content-Type": "application/json" } }),
+        body: JSON.stringify(body),
+        signal: effectiveSignal,
+      });
+      if (!response.ok) {
+        const detail = await parseError(response);
+        if (shouldEmitAuthEvent(response.status, detail)) emitAuthError(response.status, detail);
+        if (mounted) onError?.(new ApiClientError(detail, response.status));
+        return;
+      }
+      const reader = response.body?.getReader();
+      if (!reader) {
+        if (mounted) onError?.(new Error("No response body"));
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (mounted && !effectiveSignal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        let currentEvent = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && currentEvent && mounted) {
+            try {
+              const data = JSON.parse(line.slice(6)) as unknown;
+              onEvent(currentEvent, data);
+            } catch {
+              /* ignore parse errors */
+            }
+            currentEvent = "";
+          }
+        }
+      }
+    } catch (err) {
+      if (mounted && err instanceof Error && err.name !== "AbortError") {
+        onError?.(err);
+      }
+    }
+  })();
+
+  return () => {
+    mounted = false;
+    controller.abort();
+  };
+}
