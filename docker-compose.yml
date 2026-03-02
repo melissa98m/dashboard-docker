@@ -11,7 +11,7 @@ services:
       - .env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./data:/data
+      - dashboard_data:/data
     environment:
       - DATABASE_URL=sqlite:////data/dashboard.db
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -28,15 +28,20 @@ services:
       context: .
       dockerfile: dashboard-web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        API_UPSTREAM_URL: ${API_UPSTREAM_URL:-http://dashboard-api:8000}
     container_name: dashboard-web
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=
+      - API_UPSTREAM_URL=http://dashboard-api:8000
     ports:
       - "3000:3000"
     depends_on:
       dashboard-api:
         condition: service_healthy
+
+volumes:
+  dashboard_data:

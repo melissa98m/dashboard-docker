@@ -95,15 +95,17 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def ensure_bootstrap_admin() -> None:
-    """Create bootstrap admin account on first run when configured."""
+    """Create bootstrap admin account when configured and that username does not exist."""
     username = (settings.auth_bootstrap_admin_username or "").strip()
     password = settings.auth_bootstrap_admin_password or ""
     if not settings.auth_enabled or not username or not password:
         return
     now = _now_iso()
     with sqlite3.connect(get_db_path()) as conn:
-        row = conn.execute("SELECT id FROM users LIMIT 1").fetchone()
-        if row is not None:
+        existing = conn.execute(
+            "SELECT id FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        if existing is not None:
             return
         conn.execute(
             """

@@ -34,7 +34,7 @@ make up
 | `make purge-audit` | Purge les logs d'audit selon la rétention |
 | `make create-user USERNAME=<nom> [ROLE=viewer|admin]` | Crée un utilisateur (mot de passe saisi en prompt masqué) |
 | `make db-backup` | Sauvegarde SQLite dans `backups/` (services doivent être démarrés) |
-| `make clean` | Arrête les services et purge le cache Docker (ne supprime pas le dossier `./data`) |
+| `make clean` | Arrête les services et purge le cache Docker (ne supprime pas le volume de données) |
 | `make health-check` | Vérifie la santé de l'API (pour cron, Uptime Kuma) via `./scripts/health-check.sh` |
 | `make shell-api` | Shell dans le conteneur API |
 | `make shell-web` | Shell dans le conteneur web |
@@ -94,14 +94,17 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SPEC.md](docs/SPEC.md),
 
 ## Données persistantes (utilisateurs, etc.)
 
-Les utilisateurs et la base SQLite sont stockés dans le **dossier local `./data`** (bind mount). Ils **persistent** entre `make build`, `make up`, `make down` et `make restart` car les données sont sur le disque dans le projet.
+Les utilisateurs et la base SQLite sont stockés dans un **volume Docker nommé** (`dashboard_data`). Les données **persistent** entre `make up`, `make down`, `make restart` et même après un nouveau `git clone` ou changement de répertoire.
 
+- **Sauvegardes** : `make db-backup` (copie la DB dans `backups/`)
+- **Supprimer les données** : `docker compose down -v` (⚠️ supprime le volume)
 
-Pour conserver les données : ne pas supprimer `./data` ; sauvegardes via `make db-backup`.
+**Premier utilisateur automatique** : définir dans `.env` les variables `AUTH_BOOTSTRAP_ADMIN_USERNAME` et `AUTH_BOOTSTRAP_ADMIN_PASSWORD`. Au premier démarrage avec une base vide, l’admin sera créé automatiquement (voir [docs/AUTH_OPERATIONS.md](docs/AUTH_OPERATIONS.md)).
 
-**Migration depuis un ancien volume Docker** : si vous aviez des données dans `docker-dashboard_dashboard-data` ou `vibe-coding-llm-kit_dashboard-data` :
+**Migration depuis l’ancien bind mount `./data`** (si vous aviez déjà des données avant ce changement) :
 
 ```bash
-mkdir -p data
-docker run --rm -v docker-dashboard_dashboard-data:/from -v $(pwd)/data:/to alpine cp -a /from/. /to/
+make up
+docker cp ./data/dashboard.db dashboard-api:/data/dashboard.db 2>/dev/null || true
+make restart
 ```
