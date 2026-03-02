@@ -32,6 +32,16 @@ def list_rules() -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def rule_exists(container_id: str, metric_type: MetricType) -> bool:
+    """Check if a rule already exists for this container and metric."""
+    with _db_connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM alert_rules WHERE container_id = ? AND metric_type = ?",
+            (container_id, metric_type),
+        ).fetchone()
+    return row is not None
+
+
 def get_rule(rule_id: int) -> dict[str, Any] | None:
     with _db_connect() as conn:
         row = conn.execute(
@@ -153,6 +163,41 @@ def delete_rule(rule_id: int) -> bool:
         conn.execute("DELETE FROM alert_cooldowns WHERE alert_rule_id = ?", (rule_id,))
         cur = conn.execute("DELETE FROM alert_rules WHERE id = ?", (rule_id,))
         return cur.rowcount > 0
+
+
+DEFAULT_ESSENTIAL_RULES: list[tuple[MetricType, float]] = [
+    ("cpu_percent", 90.0),
+    ("ram_percent", 90.0),
+]
+
+
+def seed_default_rules_for_containers(
+    containers: list[tuple[str, str]],
+    *,
+    cooldown_seconds: int = 300,
+    debounce_samples: int = 1,
+) -> int:
+    """
+    Create essential default alert rules for containers that don't have any.
+    Returns the number of rules created.
+    """
+    created = 0
+    for container_id, container_name in containers:
+        for metric_type, threshold in DEFAULT_ESSENTIAL_RULES:
+            if rule_exists(container_id, metric_type):
+                continue
+            create_rule(
+                container_id=container_id,
+                container_name=container_name,
+                metric_type=metric_type,
+                threshold=threshold,
+                cooldown_seconds=cooldown_seconds,
+                debounce_samples=debounce_samples,
+                ntfy_topic=None,
+                enabled=True,
+            )
+            created += 1
+    return created
 
 
 def evaluate_rules(
