@@ -14,7 +14,7 @@
 - Shell (web): `make shell-web` ou `docker compose exec dashboard-web sh`
 
 ## Standard commands (must exist)
-- Lint: `make lint` (nécessite `make up` pour exec ; test via `run` sans)
+- Lint: `make lint` (nécessite `make up` pour exec) ; `make lint-ci` (CI, sans stack démarrée)
 - Tests: `make test` ; CI: `make test-ci` (fail-fast, sortie concise)
 - Format: `make format`
 - Build: `make build`
