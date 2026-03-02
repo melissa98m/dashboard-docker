@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { apiJson } from "../../lib/api-client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiJson, streamSse } from "../../lib/api-client";
+import {
+  HISTORY_LENGTH,
+  StatsCharts,
+  type StatsDataPoint,
+} from "./components/stats-charts";
 
 interface ContainerDetail {
   id: string;
@@ -44,7 +47,9 @@ export default function ContainerDetailPage({
     memory_mb: 0,
     memory_percent: 0,
   });
+  const [statsHistory, setStatsHistory] = useState<StatsDataPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const containerId = useMemo(() => params.id, [params.id]);
 
   useEffect(() => {
@@ -68,23 +73,28 @@ export default function ContainerDetailPage({
   }, [containerId]);
 
   useEffect(() => {
-    const statsSource = new EventSource(
-      `${API_URL}/api/containers/${encodeURIComponent(containerId)}/stats`
-    );
-
-    statsSource.addEventListener("stats", (event) => {
-      const message = event as MessageEvent;
-      const payload = JSON.parse(message.data) as StatsPayload;
-      setStats(payload);
+    setStatsError(null);
+    setStatsHistory([]);
+    const stop = streamSse(`/api/containers/${encodeURIComponent(containerId)}/stats`, {
+      onEvent: (eventType, data) => {
+        if (eventType === "stats") {
+          const payload = data as StatsPayload;
+          setStats(payload);
+          setStatsHistory((prev) => {
+            const point: StatsDataPoint = {
+              ts: Date.now(),
+              cpu_percent: payload.cpu_percent,
+              memory_mb: payload.memory_mb,
+              memory_percent: payload.memory_percent,
+            };
+            const next = [...prev, point];
+            return next.length > HISTORY_LENGTH ? next.slice(-HISTORY_LENGTH) : next;
+          });
+        }
+      },
+      onError: (err) => setStatsError(err.message),
     });
-
-    statsSource.onerror = () => {
-      statsSource.close();
-    };
-
-    return () => {
-      statsSource.close();
-    };
+    return stop;
   }, [containerId]);
 
   if (error) {
@@ -134,8 +144,18 @@ export default function ContainerDetailPage({
 
       <section className="panel">
         <h2 className="font-semibold mb-2">Stats live</h2>
-        <p>CPU: {stats.cpu_percent.toFixed(2)}%</p>
-        <p>RAM: {stats.memory_mb.toFixed(2)} MB ({stats.memory_percent.toFixed(2)}%)</p>
+        {statsError ? (
+          <p className="text-amber-400 text-sm">{statsError}</p>
+        ) : (
+          <>
+            <p>CPU: {stats.cpu_percent.toFixed(2)}%</p>
+            <p>RAM: {stats.memory_mb.toFixed(2)} MB ({stats.memory_percent.toFixed(2)}%)</p>
+            <StatsCharts
+              data={statsHistory}
+              isRunning={detail.status === "running"}
+            />
+          </>
+        )}
       </section>
 
       <section className="panel">
