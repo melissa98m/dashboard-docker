@@ -3,7 +3,7 @@
 ## Vue d'ensemble
 
 - **CI** : lint, tests, build sur chaque push/PR vers `main`
-- **PR Auto-Create** : lint, tests, build sur chaque push vers une branche hors `main` ; crée une PR vers `main` si elle n'existe pas (chaque push met à jour la PR)
+- **Auto Pull Request** : crée/met à jour une PR à chaque push vers une branche hors `main`
 - **CD** : déploiement sur le Raspberry Pi à chaque push sur `main` (ou manuel)
 
 ## Workflows
@@ -11,7 +11,6 @@
 | Workflow         | Fichier                            | Déclencheur                     |
 |------------------|-------------------------------------|---------------------------------|
 | CI               | `.github/workflows/ci.yml`          | Push + PR sur `main`            |
-| PR Auto-Create   | `.github/workflows/pr-auto-create.yml` | Push branches hors `main`      |
 | Auto Pull Request| `.github/workflows/auto-pull-request.yml` | Push branches hors `main`/`master` |
 | Deploy           | `.github/workflows/deploy.yml`      | Push sur `main` + `workflow_dispatch` |
 
@@ -21,16 +20,6 @@ Exécute en parallèle :
 - **Lint** : `make lint-ci` (ruff, mypy, ESLint)
 - **Test** : `make test-ci` (pytest + Vitest)
 - **Build** : `make build` (images Docker)
-
-## PR Auto-Create
-
-Workflow séparé qui s'exécute sur chaque push vers une branche autre que `main` :
-
-1. **Lint, Test, Build** : mêmes jobs que la CI (exécutés en parallèle)
-2. **Create PR** : si les tests passent et qu'aucune PR ouverte n'existe déjà pour cette branche, crée une PR vers `main`
-3. **Mise à jour** : chaque push sur la branche met automatiquement à jour la PR (comportement natif GitHub)
-
-Utilise le `GITHUB_TOKEN` fourni par Actions ; aucun secret additionnel requis.
 
 ## Auto Pull Request
 
