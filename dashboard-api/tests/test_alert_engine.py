@@ -23,8 +23,8 @@ def test_extract_metrics():
 
 
 def test_run_once_triggers_notification_and_audit(monkeypatch):
-    from app.services import alert_engine
     from app.config import settings
+    from app.services import alert_engine
 
     class FakeContainer:
         short_id = "abc123"

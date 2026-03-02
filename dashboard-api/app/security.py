@@ -218,9 +218,7 @@ def verify_restart_token(token: str) -> str:
         raise ValueError("Malformed token") from exc
 
 
-def create_execution_stream_token(
-    *, execution_id: int, ttl_seconds: int | None = None
-) -> str:
+def create_execution_stream_token(*, execution_id: int, ttl_seconds: int | None = None) -> str:
     """Create signed token for execution output stream."""
     secret = _token_secret()
     expires = datetime.now(UTC) + timedelta(

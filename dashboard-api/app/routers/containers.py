@@ -6,8 +6,9 @@ import re
 import threading
 import time
 from collections import deque
+from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any, Iterator
+from typing import Any
 
 import docker
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -44,9 +45,7 @@ _DEFAULT_LOG_REDACTION_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         r"\1[REDACTED]",
     ),
     (
-        re.compile(
-            r"(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\b(\s*[:=]\s*)([^\s,;]+)"
-        ),
+        re.compile(r"(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\b(\s*[:=]\s*)([^\s,;]+)"),
         r"\1\2[REDACTED]",
     ),
     (
@@ -68,7 +67,10 @@ def _load_extra_log_redaction_patterns() -> tuple[re.Pattern[str], ...]:
         try:
             compiled.append(re.compile(candidate))
         except re.error:
-            logger.warning("Ignoring invalid LOG_SNAPSHOT_REDACTION_EXTRA_PATTERNS regex: %s", candidate)
+            logger.warning(
+                "Ignoring invalid LOG_SNAPSHOT_REDACTION_EXTRA_PATTERNS regex: %s",
+                candidate,
+            )
     return tuple(compiled)
 
 
@@ -360,7 +362,10 @@ def list_container_command_specs(
     return [ContainerCommandSpecItem(**row) for row in list_specs(container_id=container_id)]
 
 
-@router.get("/{container_id}/commands/discovered", response_model=list[ContainerDiscoveredCommandItem])
+@router.get(
+    "/{container_id}/commands/discovered",
+    response_model=list[ContainerDiscoveredCommandItem],
+)
 def list_container_discovered_commands(
     container_id: str,
     limit: int = Query(default=100, ge=1, le=500),

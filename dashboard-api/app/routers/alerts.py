@@ -9,7 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.db.alerts import create_rule, delete_rule, evaluate_rules, get_rule, list_rules, update_rule
+from app.db.alerts import (
+    create_rule,
+    delete_rule,
+    evaluate_rules,
+    get_rule,
+    list_rules,
+    update_rule,
+)
 from app.db.audit import list_audit_logs, write_audit_log
 from app.security import require_read_access, require_write_access
 
@@ -281,7 +288,9 @@ def get_alert_history(
         except ValueError:
             created_dt = None
 
-        normalized_container_id = detail_container_id if isinstance(detail_container_id, str) else None
+        normalized_container_id = (
+            detail_container_id if isinstance(detail_container_id, str) else None
+        )
         if container_id is not None and normalized_container_id != container_id:
             continue
         if metric_type is not None and normalized_metric_type != metric_type:
@@ -290,7 +299,9 @@ def get_alert_history(
             continue
 
         normalized_triggered_by = str(row.get("triggered_by") or "unknown")
-        normalized_source = "alert-engine" if normalized_triggered_by == "alert-engine" else "manual"
+        normalized_source = (
+            "alert-engine" if normalized_triggered_by == "alert-engine" else "manual"
+        )
         if triggered_by != "all" and normalized_source != triggered_by:
             continue
 
@@ -304,7 +315,11 @@ def get_alert_history(
                 value=value,
                 triggered_by=normalized_triggered_by,
                 created_at=created_at,
-                can_restart=rule_id is not None and isinstance(normalized_container_id, str) and bool(normalized_container_id),
+                can_restart=(
+                    rule_id is not None
+                    and isinstance(normalized_container_id, str)
+                    and bool(normalized_container_id)
+                ),
             )
         )
     if sort == "created_at_asc":

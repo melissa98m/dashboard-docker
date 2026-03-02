@@ -1,7 +1,7 @@
 """Authentication endpoints tests."""
 
-from datetime import UTC, datetime
 import sqlite3
+from datetime import UTC, datetime
 
 from app.config import settings
 from app.db.auth import create_session, ensure_bootstrap_admin, get_session
@@ -591,7 +591,10 @@ def test_revoke_current_session_requires_allow_current_flag(client):
         assert login.status_code == 200
 
         csrf_token = client.cookies.get(settings.auth_csrf_cookie_name)
-        listed = client.get("/api/auth/sessions?username=admin", headers={"x-csrf-token": csrf_token})
+        listed = client.get(
+            "/api/auth/sessions?username=admin",
+            headers={"x-csrf-token": csrf_token},
+        )
         assert listed.status_code == 200
         current_item = next(item for item in listed.json()["items"] if item["is_current"] is True)
         current_session_id = int(current_item["session_id"])

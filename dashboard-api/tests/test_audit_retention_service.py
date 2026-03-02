@@ -1,7 +1,7 @@
 """Audit retention background service tests."""
 
-from datetime import UTC, datetime, timedelta
 import sqlite3
+from datetime import UTC, datetime, timedelta
 
 from app.config import settings
 from app.db.init import get_db_path
@@ -12,7 +12,9 @@ def _insert_audit(action: str, created_at: str) -> None:
     with sqlite3.connect(get_db_path()) as conn:
         conn.execute(
             """
-            INSERT INTO audit_log (action, resource_type, resource_id, triggered_by, details, created_at)
+            INSERT INTO audit_log (
+                action, resource_type, resource_id, triggered_by, details, created_at
+            )
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (action, "test", "r", "pytest", "{}", created_at),

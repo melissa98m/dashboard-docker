@@ -70,7 +70,9 @@ def list_runtime_settings() -> dict[str, RuntimeSettingValue]:
     return parsed
 
 
-def upsert_runtime_settings(*, values: dict[RuntimeSettingKey, RuntimeSettingValue], actor: str) -> None:
+def upsert_runtime_settings(
+    *, values: dict[RuntimeSettingKey, RuntimeSettingValue], actor: str
+) -> None:
     """Persist selected runtime settings with actor metadata."""
     if not values:
         return

@@ -57,7 +57,7 @@ class FakeContainer:
         self.remove_args = {"v": v, "force": force}
 
     def logs(self, tail: int = 100) -> bytes:
-        return f"log-1\nlog-2\nlast-{tail}".encode("utf-8")
+        return f"log-1\nlog-2\nlast-{tail}".encode()
 
     def stats(self, stream: bool = True, decode: bool = True):
         if stream and decode:
@@ -543,7 +543,12 @@ def test_container_commands_scoped_endpoints_filter_by_container(client):
         container_id="def456",
         service_name="worker",
         commands=[
-            {"name": "python -m pytest", "argv": ["python", "-m", "pytest"], "cwd": "/srv", "source": "poetry"}
+            {
+                "name": "python -m pytest",
+                "argv": ["python", "-m", "pytest"],
+                "cwd": "/srv",
+                "source": "poetry",
+            }
         ],
     )
 

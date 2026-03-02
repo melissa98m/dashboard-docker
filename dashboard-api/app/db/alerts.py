@@ -99,7 +99,8 @@ def update_rule(rule_id: int, updates: dict[str, Any]) -> dict[str, Any] | None:
             row = conn.execute(
                 """
                 SELECT id, container_id, container_name, metric_type, threshold,
-                       cooldown_seconds, debounce_samples, ntfy_topic, enabled, created_at, updated_at
+                       cooldown_seconds, debounce_samples, ntfy_topic, enabled,
+                       created_at, updated_at
                 FROM alert_rules WHERE id = ?
                 """,
                 (rule_id,),
@@ -240,7 +241,9 @@ def evaluate_rules(
             current_breaches = previous_breaches + 1
             conn.execute(
                 """
-                INSERT INTO alert_debounce_state (alert_rule_id, consecutive_breaches, last_breach_at)
+                INSERT INTO alert_debounce_state (
+                    alert_rule_id, consecutive_breaches, last_breach_at
+                )
                 VALUES (?, ?, ?)
                 ON CONFLICT(alert_rule_id)
                 DO UPDATE SET

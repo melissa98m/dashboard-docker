@@ -71,9 +71,8 @@ def _notify_trigger(
     if settings.public_api_url and settings.api_secret_key:
         try:
             token = create_restart_token(container_id=container_id)
-            action_url = (
-                f"{settings.public_api_url.rstrip('/')}/api/containers/restart-by-token?token={token}"
-            )
+            base = settings.public_api_url.rstrip("/")
+            action_url = f"{base}/api/containers/restart-by-token?token={token}"
         except ValueError:
             action_url = None
     threshold_label = f"{threshold:.2f}" if threshold is not None else "n/a"
@@ -124,18 +123,10 @@ def run_once() -> int:
                 triggered_count += 1
                 rule_id = int(result["rule_id"])
                 threshold = (
-                    float(result["threshold"])
-                    if result.get("threshold") is not None
-                    else None
+                    float(result["threshold"]) if result.get("threshold") is not None else None
                 )
-                topic = (
-                    str(result["ntfy_topic"])
-                    if result.get("ntfy_topic") is not None
-                    else None
-                )
-                rule_container_name = str(
-                    result.get("container_name") or container_name
-                )
+                topic = str(result["ntfy_topic"]) if result.get("ntfy_topic") is not None else None
+                rule_container_name = str(result.get("container_name") or container_name)
                 write_audit_log(
                     action="alert_triggered_auto",
                     resource_type="alert_rule",

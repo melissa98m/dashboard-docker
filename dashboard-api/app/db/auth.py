@@ -168,7 +168,8 @@ def update_user_role(*, user_id: int, role: str) -> dict[str, Any] | None:
     with sqlite3.connect(get_db_path()) as conn:
         conn.row_factory = sqlite3.Row
         user = conn.execute(
-            "SELECT id, username, role, last_login_at, created_at, updated_at FROM users WHERE id = ?",
+            "SELECT id, username, role, last_login_at, created_at, updated_at "
+            "FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
         if user is None:
@@ -186,7 +187,8 @@ def update_user_role(*, user_id: int, role: str) -> dict[str, Any] | None:
             (normalized_role, now, user_id),
         )
         updated = conn.execute(
-            "SELECT id, username, role, last_login_at, created_at, updated_at FROM users WHERE id = ?",
+            "SELECT id, username, role, last_login_at, created_at, updated_at "
+            "FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
     if updated is None:
@@ -227,7 +229,8 @@ def update_user_password(*, user_id: int, password: str) -> dict[str, Any] | Non
             (_build_password_hash(password), now, user_id),
         )
         updated = conn.execute(
-            "SELECT id, username, role, last_login_at, created_at, updated_at FROM users WHERE id = ?",
+            "SELECT id, username, role, last_login_at, created_at, updated_at "
+            "FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
     if updated is None:
@@ -242,7 +245,9 @@ def update_user_password(*, user_id: int, password: str) -> dict[str, Any] | Non
     }
 
 
-def authenticate_credentials(*, username: str, password: str) -> tuple[bool, str | None, int | None]:
+def authenticate_credentials(
+    *, username: str, password: str
+) -> tuple[bool, str | None, int | None]:
     """Validate credentials, applying lockout policy."""
     normalized = username.strip()
     if not normalized or not password:
@@ -311,7 +316,8 @@ def create_session(*, user_id: int) -> tuple[str, str]:
         conn.execute(
             """
             INSERT INTO auth_sessions (
-                user_id, session_token_hash, csrf_token, created_at, expires_at, last_seen_at, revoked_at
+                user_id, session_token_hash, csrf_token,
+                created_at, expires_at, last_seen_at, revoked_at
             ) VALUES (?, ?, ?, ?, ?, ?, NULL)
             """,
             (user_id, _hash_token(raw_session), csrf_token, now, expires_at, now),
@@ -371,7 +377,8 @@ def revoke_session(*, raw_session_token: str) -> None:
     now = _now_iso()
     with sqlite3.connect(get_db_path()) as conn:
         conn.execute(
-            "UPDATE auth_sessions SET revoked_at = ? WHERE session_token_hash = ? AND revoked_at IS NULL",
+            "UPDATE auth_sessions SET revoked_at = ? "
+            "WHERE session_token_hash = ? AND revoked_at IS NULL",
             (now, _hash_token(raw_session_token)),
         )
 

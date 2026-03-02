@@ -1,7 +1,7 @@
 """Auth session retention background service tests."""
 
-from datetime import UTC, datetime, timedelta
 import sqlite3
+from datetime import UTC, datetime, timedelta
 
 from app.db.init import get_db_path
 from app.services.auth_session_retention import run_once
@@ -35,7 +35,8 @@ def _insert_session(
         conn.execute(
             """
             INSERT INTO auth_sessions (
-                user_id, session_token_hash, csrf_token, created_at, expires_at, last_seen_at, revoked_at
+                user_id, session_token_hash, csrf_token,
+                created_at, expires_at, last_seen_at, revoked_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, hash_val, "csrf-token", now, expires_at, now, revoked_at),

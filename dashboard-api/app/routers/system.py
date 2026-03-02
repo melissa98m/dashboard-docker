@@ -220,7 +220,9 @@ def get_security_status(request: Request, _actor: str = Depends(require_read_acc
     redaction_preview = get_log_redaction_preview()
     alert_engine = getattr(request.app.state, "alert_engine", None)
     audit_retention_service = getattr(request.app.state, "audit_retention_service", None)
-    auth_session_retention_service = getattr(request.app.state, "auth_session_retention_service", None)
+    auth_session_retention_service = getattr(
+        request.app.state, "auth_session_retention_service", None
+    )
     return SecurityStatusResponse(
         auth_enabled=settings.auth_enabled,
         write_auth_configured=settings.auth_enabled,

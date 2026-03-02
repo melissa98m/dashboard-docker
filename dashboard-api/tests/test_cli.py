@@ -7,7 +7,9 @@ import pytest
 from app import cli
 
 
-def test_create_user_cli_success(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
+def test_create_user_cli_success(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
     monkeypatch.setattr(
         sys,
         "argv",

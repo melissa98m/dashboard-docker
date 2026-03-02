@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.config import settings
 from app.db.auth import ensure_bootstrap_admin
 from app.db.init import migrate
 from app.db.runtime_settings import apply_runtime_settings, list_runtime_settings
@@ -15,7 +16,6 @@ from app.services.alert_engine import AlertEngine
 from app.services.audit_retention import AuditRetentionService
 from app.services.auth_session_retention import AuthSessionRetentionService
 from app.services.command_retention import CommandRetentionService
-from app.config import settings
 
 
 @asynccontextmanager
@@ -95,6 +95,7 @@ async def enforce_authenticated_api(request: Request, call_next):
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     return await call_next(request)
+
 
 app.include_router(health.router, tags=["health"])
 app.include_router(containers.router, prefix="/api/containers", tags=["containers"])

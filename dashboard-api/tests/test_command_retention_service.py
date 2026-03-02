@@ -1,15 +1,21 @@
 """Command executions retention background service tests."""
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import sqlite3
 
 from app.config import settings
 from app.db.init import get_db_path
 from app.services.command_retention import run_once
 
 
-def _insert_execution(*, container_id: str, started_at: str, stdout_path: str, stderr_path: str) -> None:
+def _insert_execution(
+    *,
+    container_id: str,
+    started_at: str,
+    stdout_path: str,
+    stderr_path: str,
+) -> None:
     with sqlite3.connect(get_db_path()) as conn:
         conn.execute(
             """
@@ -85,7 +91,9 @@ def test_command_retention_run_once_purges_old_rows_and_logs(tmp_path):
         settings.command_execution_retention_days = previous_days
 
     with sqlite3.connect(get_db_path()) as conn:
-        rows = conn.execute("SELECT container_id FROM executions ORDER BY container_id ASC").fetchall()
+        rows = conn.execute(
+            "SELECT container_id FROM executions ORDER BY container_id ASC"
+        ).fetchall()
         container_ids = [row[0] for row in rows]
 
     assert "old-ctn" not in container_ids

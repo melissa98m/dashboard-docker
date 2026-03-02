@@ -147,7 +147,9 @@ def create_execution(
         return int(cur.lastrowid)
 
 
-def complete_execution(*, execution_id: int, exit_code: int, duration_ms: int | None = None) -> None:
+def complete_execution(
+    *, execution_id: int, exit_code: int, duration_ms: int | None = None
+) -> None:
     status = "success" if exit_code == 0 else "failed"
     with _conn() as conn:
         conn.execute(
@@ -196,7 +198,9 @@ def count_purgeable_executions(*, older_than_days: int) -> int:
     safe_days = max(1, min(older_than_days, 3650))
     cutoff = (datetime.now(UTC) - timedelta(days=safe_days)).isoformat()
     with _conn() as conn:
-        row = conn.execute("SELECT COUNT(*) FROM executions WHERE started_at < ?", (cutoff,)).fetchone()
+        row = conn.execute(
+            "SELECT COUNT(*) FROM executions WHERE started_at < ?", (cutoff,)
+        ).fetchone()
     return int(row[0] if row else 0)
 
 

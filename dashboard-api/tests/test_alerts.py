@@ -171,9 +171,7 @@ def test_alert_rule_restart_container_action(client, monkeypatch):
     assert create_response.status_code == 200
     rule_id = create_response.json()["id"]
 
-    action_response = client.post(
-        f"/api/alerts/rules/{rule_id}/restart-container", headers=headers
-    )
+    action_response = client.post(f"/api/alerts/rules/{rule_id}/restart-container", headers=headers)
     assert action_response.status_code == 200
     assert action_response.json()["ok"] is True
     assert fake.restarted is True
