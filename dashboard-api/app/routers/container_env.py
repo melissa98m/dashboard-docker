@@ -221,8 +221,12 @@ def update_env_profile(
         ),
         writable=writable,
         pending_apply=bool(profile["pending_apply"]),
-        last_detect_status=str(profile["last_detect_status"]) if profile.get("last_detect_status") else None,
-        last_apply_status=str(profile["last_apply_status"]) if profile.get("last_apply_status") else None,
+        last_detect_status=(
+            str(profile["last_detect_status"]) if profile.get("last_detect_status") else None
+        ),
+        last_apply_status=(
+            str(profile["last_apply_status"]) if profile.get("last_apply_status") else None
+        ),
         updated_at=str(profile["updated_at"]) if profile.get("updated_at") else None,
         env=_to_items(merged),
     )
@@ -238,7 +242,11 @@ def apply_env_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="Env profile not found")
     env_payload = profile.get("env")
-    env = {key: str(value) for key, value in env_payload.items()} if isinstance(env_payload, dict) else {}
+    env = (
+        {key: str(value) for key, value in env_payload.items()}
+        if isinstance(env_payload, dict)
+        else {}
+    )
     if payload.dry_run:
         return EnvApplyResponse(
             ok=True,
@@ -274,8 +282,12 @@ def apply_env_profile(
         container_id=container_id,
         env=env,
         source_mode=str(profile.get("source_mode") or "db_fallback"),
-        detected_env_file=(str(profile.get("detected_env_file")) if profile.get("detected_env_file") else None),
-        last_detect_status=(str(profile.get("last_detect_status")) if profile.get("last_detect_status") else None),
+        detected_env_file=(
+            str(profile.get("detected_env_file")) if profile.get("detected_env_file") else None
+        ),
+        last_detect_status=(
+            str(profile.get("last_detect_status")) if profile.get("last_detect_status") else None
+        ),
         last_apply_status="applied",
         pending_apply=False,
         updated_by=actor,

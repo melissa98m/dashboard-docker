@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch, apiJson } from "../lib/api-client";
+import { useAuth } from "../contexts/auth-context";
 import { useNotifications } from "../components/notifications";
 
 interface SecurityStatus {
@@ -131,12 +132,20 @@ function HealthBadge({ health }: { health: ServiceHealth }) {
 
 export default function SettingsPage() {
   const notify = useNotifications();
+  const { me } = useAuth();
   const [status, setStatus] = useState<SecurityStatus | null>(null);
   const [deps, setDeps] = useState<DependenciesHealth | null>(null);
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings | null>(null);
   const [form, setForm] = useState<RuntimeSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [newRole, setNewRole] = useState<"viewer" | "admin">("viewer");
+  const [createUserSubmitting, setCreateUserSubmitting] = useState(false);
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
 
   const syncForm = (nextValues: RuntimeSettings) => {
     setRuntimeSettings(nextValues);
@@ -191,6 +200,52 @@ export default function SettingsPage() {
   const onReset = () => {
     if (!runtimeSettings) return;
     setForm(runtimeSettings);
+  };
+
+  const onCreateUser = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCreateUserError(null);
+    const username = newUsername.trim();
+    if (!username) {
+      setCreateUserError("Nom d'utilisateur requis.");
+      return;
+    }
+    if (newPassword.length < 12) {
+      setCreateUserError("Mot de passe : minimum 12 caractères, lettres et chiffres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setCreateUserError("La confirmation du mot de passe ne correspond pas.");
+      return;
+    }
+    const hasAlpha = /[a-zA-Z]/.test(newPassword);
+    const hasDigit = /\d/.test(newPassword);
+    if (!hasAlpha || !hasDigit) {
+      setCreateUserError("Mot de passe : lettres et chiffres requis.");
+      return;
+    }
+    setCreateUserSubmitting(true);
+    try {
+      await apiFetch("/api/auth/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          password: newPassword,
+          role: newRole,
+        }),
+      });
+      setNewUsername("");
+      setNewPassword("");
+      setConfirmPassword("");
+      notify.success(`Utilisateur ${username} créé.`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur";
+      setCreateUserError(msg);
+      notify.error(msg);
+    } finally {
+      setCreateUserSubmitting(false);
+    }
   };
 
   if (error) {
@@ -445,6 +500,75 @@ export default function SettingsPage() {
           </form>
         )}
       </section>
+
+      {me?.role === "admin" && (
+        <section className="panel space-y-3">
+          <h2 className="font-semibold">Créer un utilisateur</h2>
+          <p className="text-xs text-slate-400">
+            Minimum 12 caractères, lettres et chiffres. Réservé aux admins.
+          </p>
+          <form onSubmit={onCreateUser} className="space-y-3">
+            {createUserError && (
+              <p className="text-sm text-red-400">{createUserError}</p>
+            )}
+            <label>
+              <span className="field-label">Nom d&apos;utilisateur</span>
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="alice"
+                minLength={3}
+                maxLength={120}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              <span className="field-label">Mot de passe</span>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="12+ caractères, lettres et chiffres"
+                minLength={12}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+                autoComplete="new-password"
+              />
+            </label>
+            <label>
+              <span className="field-label">Confirmer le mot de passe</span>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Saisir à nouveau"
+                minLength={12}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+                autoComplete="new-password"
+              />
+            </label>
+            <label>
+              <span className="field-label">Rôle</span>
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value as "viewer" | "admin")}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              >
+                <option value="viewer">Viewer (lecture seule)</option>
+                <option value="admin">Admin (lecture + écriture)</option>
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={createUserSubmitting}
+              className="btn btn-success disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {createUserSubmitting ? "Création..." : "Créer l&apos;utilisateur"}
+            </button>
+          </form>
+        </section>
+      )}
 
       <section className="panel space-y-2 text-sm">
         <p>Sante globale dependances: {deps?.ok ? "ok" : "degradee"}</p>

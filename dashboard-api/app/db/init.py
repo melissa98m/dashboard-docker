@@ -35,9 +35,7 @@ def migrate() -> None:
             )
         env_columns = conn.execute("PRAGMA table_info(container_env_profiles)").fetchall()
         env_column_names = {
-            column[1]
-            for column in env_columns
-            if isinstance(column, tuple) and len(column) > 1
+            column[1] for column in env_columns if isinstance(column, tuple) and len(column) > 1
         }
         if env_columns and "pending_apply" not in env_column_names:
             conn.execute(

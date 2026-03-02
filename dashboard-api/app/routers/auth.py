@@ -7,17 +7,17 @@ from app.config import settings
 from app.db.audit import write_audit_log
 from app.db.auth import (
     authenticate_credentials,
-    create_user,
     create_session,
+    create_user,
     get_session,
     list_active_sessions,
     list_users,
     revoke_all_sessions_for_user_id,
     revoke_all_sessions_for_username,
-    revoke_session_by_id,
     revoke_session,
-    update_user_role,
+    revoke_session_by_id,
     update_user_password,
+    update_user_role,
 )
 from app.security import (
     AuthContext,
@@ -297,7 +297,10 @@ def create_auth_user(
     except ValueError as exc:
         reason = str(exc)
         if reason == "username_taken":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already exists",
+            )
         if reason in {"invalid_username", "weak_password", "invalid_role"}:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
         raise

@@ -9,30 +9,34 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import docker
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.db.audit import write_audit_log
 from app.db.commands import (
-    count_discovered_commands,
     complete_execution,
+    count_discovered_commands,
     create_execution,
     create_spec,
     get_discovered_command,
-    get_spec_by_container_and_name,
     get_execution,
     get_spec,
+    get_spec_by_container_and_name,
+    latest_discovered_at,
     list_discovered_commands,
     list_executions,
     list_specs,
-    latest_discovered_at,
     replace_discovered_commands,
 )
 from app.db.stream_tokens import consume_stream_token
-from app.security import require_read_access, require_write_access
-from app.security import create_execution_stream_token, verify_execution_stream_token
+from app.security import (
+    create_execution_stream_token,
+    require_read_access,
+    require_write_access,
+    verify_execution_stream_token,
+)
 from app.services.command_discovery import discover_commands
 
 router = APIRouter()
@@ -246,9 +250,7 @@ def _execute_worker(
                 environment=env,
             )
             exec_id = (
-                str(exec_created.get("Id"))
-                if isinstance(exec_created, dict)
-                else str(exec_created)
+                str(exec_created.get("Id")) if isinstance(exec_created, dict) else str(exec_created)
             )
             stream = api.exec_start(exec_id, stream=True, demux=True)
             for chunk in stream:
@@ -427,7 +429,9 @@ def execute_command(payload: ExecuteRequest, actor: str = Depends(require_write_
 
 
 @router.post("/discover", response_model=DiscoverResponse)
-def discover_container_commands(payload: DiscoverRequest, actor: str = Depends(require_write_access)):
+def discover_container_commands(
+    payload: DiscoverRequest, actor: str = Depends(require_write_access)
+):
     latest = latest_discovered_at(payload.container_id)
     if not payload.force and latest is not None:
         try:
@@ -443,7 +447,10 @@ def discover_container_commands(payload: DiscoverRequest, actor: str = Depends(r
                     resource_id=payload.container_id,
                     actor=actor,
                     result="ok",
-                    extra={"discovered_count": str(cached_count), "cache_age_seconds": str(age_seconds)},
+                    extra={
+                        "discovered_count": str(cached_count),
+                        "cache_age_seconds": str(age_seconds),
+                    },
                 )
                 return DiscoverResponse(
                     container_id=payload.container_id,

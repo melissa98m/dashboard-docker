@@ -3,16 +3,16 @@
 ## Vue d'ensemble
 
 - **CI** : lint, tests, build sur chaque push/PR vers `main`
-- **PR Auto-Create** : lint, tests, build sur chaque push vers une branche hors `main` ; crée une PR vers `main` si elle n'existe pas (chaque push met à jour la PR)
+- **Auto Pull Request** : crée/met à jour une PR à chaque push vers une branche hors `main`
 - **CD** : déploiement sur le Raspberry Pi à chaque push sur `main` (ou manuel)
 
 ## Workflows
 
-| Workflow       | Fichier                          | Déclencheur                          |
-|----------------|-----------------------------------|--------------------------------------|
-| CI             | `.github/workflows/ci.yml`        | Push + PR sur `main`                 |
-| PR Auto-Create | `.github/workflows/pr-auto-create.yml` | Push sur branches hors `main` + `workflow_dispatch` |
-| Deploy         | `.github/workflows/deploy.yml`    | Push sur `main` + `workflow_dispatch` |
+| Workflow         | Fichier                            | Déclencheur                     |
+|------------------|-------------------------------------|---------------------------------|
+| CI               | `.github/workflows/ci.yml`          | Push + PR sur `main`            |
+| Auto Pull Request| `.github/workflows/auto-pull-request.yml` | Push branches hors `main`/`master` |
+| Deploy           | `.github/workflows/deploy.yml`      | Push sur `main` + `workflow_dispatch` |
 
 ## CI
 
@@ -21,15 +21,13 @@ Exécute en parallèle :
 - **Test** : `make test-ci` (pytest + Vitest)
 - **Build** : `make build` (images Docker)
 
-## PR Auto-Create
+## Auto Pull Request
 
-Workflow séparé qui s'exécute sur chaque push vers une branche autre que `main` :
+Workflow qui crée ou met à jour une PR (corps = messages de commit) à chaque push sur une branche hors `main`/`master`.
 
-1. **Lint, Test, Build** : mêmes jobs que la CI (exécutés en parallèle)
-2. **Create PR** : si les tests passent et qu'aucune PR ouverte n'existe déjà pour cette branche, crée une PR vers `main`
-3. **Mise à jour** : chaque push sur la branche met automatiquement à jour la PR (comportement natif GitHub)
-
-Utilise le `GITHUB_TOKEN` fourni par Actions ; aucun secret additionnel requis.
+**Si erreur 403** (« GitHub Actions is not permitted to create pull requests ») :
+1. Crée un Personal Access Token avec scope `repo` : https://github.com/settings/tokens
+2. Ajoute le secret `REPO_ACCESS_TOKEN` dans **Settings → Secrets → Actions**
 
 ## Déploiement sur Raspberry Pi
 
@@ -52,6 +50,7 @@ Utilise le `GITHUB_TOKEN` fourni par Actions ; aucun secret additionnel requis.
 | `DEPLOY_HOST`    | IP ou hostname du Pi (ex. `192.168.1.10` ou `pi.local`) |
 | `DEPLOY_USER`    | Utilisateur SSH (ex. `pi`)                       |
 | `DEPLOY_PATH`    | Chemin du projet sur le Pi (ex. `/home/pi/docker-dashboard`) |
+| `REPO_ACCESS_TOKEN` | *(optionnel)* PAT scope `repo` pour Auto Pull Request si 403 |
 
 ### Génération de la clé SSH
 

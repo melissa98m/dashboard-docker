@@ -57,4 +57,6 @@ class CommandRetentionService:
                 run_once()
             except Exception:  # noqa: BLE001
                 logger.exception("Command retention cycle failed")
-            self._stop_event.wait(timeout=max(settings.command_execution_retention_poll_seconds, 10))
+            self._stop_event.wait(
+                timeout=max(settings.command_execution_retention_poll_seconds, 10)
+            )

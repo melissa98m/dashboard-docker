@@ -6,8 +6,9 @@ import re
 import threading
 import time
 from collections import deque
+from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any, Iterator
+from typing import Any, cast
 
 import docker
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -44,9 +45,7 @@ _DEFAULT_LOG_REDACTION_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         r"\1[REDACTED]",
     ),
     (
-        re.compile(
-            r"(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\b(\s*[:=]\s*)([^\s,;]+)"
-        ),
+        re.compile(r"(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\b(\s*[:=]\s*)([^\s,;]+)"),
         r"\1\2[REDACTED]",
     ),
     (
@@ -68,7 +67,10 @@ def _load_extra_log_redaction_patterns() -> tuple[re.Pattern[str], ...]:
         try:
             compiled.append(re.compile(candidate))
         except re.error:
-            logger.warning("Ignoring invalid LOG_SNAPSHOT_REDACTION_EXTRA_PATTERNS regex: %s", candidate)
+            logger.warning(
+                "Ignoring invalid LOG_SNAPSHOT_REDACTION_EXTRA_PATTERNS regex: %s",
+                candidate,
+            )
     return tuple(compiled)
 
 
@@ -96,17 +98,17 @@ def _container_image_ref(container: Any) -> str:
     """Best-effort image reference fallback for missing image metadata."""
     try:
         if container.image.tags:
-            return container.image.tags[0]
-        return container.image.short_id
+            return str(container.image.tags[0])
+        return str(container.image.short_id)
     except docker.errors.DockerException:
         attrs = getattr(container, "attrs", {}) or {}
         config = attrs.get("Config", {}) if isinstance(attrs, dict) else {}
         configured_image = config.get("Image")
         image_id = attrs.get("Image")
         if isinstance(configured_image, str) and configured_image.strip():
-            return configured_image
+            return str(configured_image)
         if isinstance(image_id, str) and image_id.strip():
-            return image_id[:24]
+            return str(image_id[:24])
         logger.warning("Container image metadata unavailable for %s", container.short_id)
         return "unknown"
 
@@ -151,9 +153,11 @@ def _last_down_reason(state: dict[str, Any]) -> str | None:
     if isinstance(exit_code, int):
         if exit_code != 0:
             return f"exit_code_{exit_code}"
-        if status in {"exited", "dead"}:
+        if status in {"exited", "dead"} and isinstance(status, str):
             return status
-    return status if isinstance(status, str) and status.strip() else None
+    if isinstance(status, str) and status.strip():
+        return cast(str, status)
+    return None
 
 
 def _snapshot_logs(container: Any, *, tail: int) -> list[str]:
@@ -360,7 +364,10 @@ def list_container_command_specs(
     return [ContainerCommandSpecItem(**row) for row in list_specs(container_id=container_id)]
 
 
-@router.get("/{container_id}/commands/discovered", response_model=list[ContainerDiscoveredCommandItem])
+@router.get(
+    "/{container_id}/commands/discovered",
+    response_model=list[ContainerDiscoveredCommandItem],
+)
 def list_container_discovered_commands(
     container_id: str,
     limit: int = Query(default=100, ge=1, le=500),

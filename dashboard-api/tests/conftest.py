@@ -31,7 +31,10 @@ def login_as_admin(client, *, auth_enabled: bool = True):
     settings.auth_bootstrap_admin_username = "admin"
     settings.auth_bootstrap_admin_password = "strong-password-123"
     ensure_bootstrap_admin()
-    r = client.post("/api/auth/login", json={"username": "admin", "password": "strong-password-123"})
+    r = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "strong-password-123"},
+    )
     assert r.status_code == 200
     return client.cookies.get(settings.auth_csrf_cookie_name)
 

@@ -220,7 +220,9 @@ def get_security_status(request: Request, _actor: str = Depends(require_read_acc
     redaction_preview = get_log_redaction_preview()
     alert_engine = getattr(request.app.state, "alert_engine", None)
     audit_retention_service = getattr(request.app.state, "audit_retention_service", None)
-    auth_session_retention_service = getattr(request.app.state, "auth_session_retention_service", None)
+    auth_session_retention_service = getattr(
+        request.app.state, "auth_session_retention_service", None
+    )
     return SecurityStatusResponse(
         auth_enabled=settings.auth_enabled,
         write_auth_configured=settings.auth_enabled,
@@ -297,7 +299,7 @@ def patch_runtime_settings(
     if typed_updates:
         previous_values = {key: str(getattr(settings, key)) for key in typed_updates}
         upsert_runtime_settings(values=typed_updates, actor=actor)
-        apply_runtime_settings(overrides=typed_updates)
+        apply_runtime_settings(overrides=cast(dict[str, int | bool], typed_updates))
         _sync_runtime_services(request)
         new_values = {key: str(getattr(settings, key)) for key in typed_updates}
         write_audit_log(

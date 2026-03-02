@@ -245,7 +245,11 @@ def test_discover_and_allowlist_flow(client, monkeypatch):
     headers = {"x-csrf-token": csrf}
     monkeypatch.setattr(commands_router, "_docker_client", lambda: _FakeDockerClient())
 
-    discover = client.post("/api/commands/discover", json={"container_id": "abc123"}, headers=headers)
+    discover = client.post(
+        "/api/commands/discover",
+        json={"container_id": "abc123"},
+        headers=headers,
+    )
     assert discover.status_code == 200
     assert discover.json()["discovered_count"] >= 1
     assert discover.json()["cached"] is False
@@ -276,7 +280,14 @@ def test_allowlist_discovered_rejects_disallowed_argv(client):
     replace_discovered_commands(
         container_id="abc123",
         service_name="api",
-        commands=[{"name": "Unsafe shell", "argv": ["bash", "-c", "id"], "cwd": "/app", "source": "manual"}],
+        commands=[
+            {
+                "name": "Unsafe shell",
+                "argv": ["bash", "-c", "id"],
+                "cwd": "/app",
+                "source": "manual",
+            }
+        ],
     )
     discovered = client.get("/api/commands/discovered?container_id=abc123")
     item_id = discovered.json()[0]["id"]
@@ -293,7 +304,11 @@ def test_discover_uses_cache_when_recent(client, monkeypatch):
     csrf = login_as_admin(client)
     headers = {"x-csrf-token": csrf}
     monkeypatch.setattr(commands_router, "_docker_client", lambda: _FakeDockerClient())
-    first = client.post("/api/commands/discover", json={"container_id": "abc123"}, headers=headers)
+    first = client.post(
+        "/api/commands/discover",
+        json={"container_id": "abc123"},
+        headers=headers,
+    )
     assert first.status_code == 200
     assert first.json()["cached"] is False
 
@@ -307,7 +322,11 @@ def test_discover_uses_cache_when_recent(client, monkeypatch):
     previous_ttl = settings.command_discovery_cache_ttl_seconds
     settings.command_discovery_cache_ttl_seconds = 3600
     try:
-        second = client.post("/api/commands/discover", json={"container_id": "abc123"}, headers=headers)
+        second = client.post(
+            "/api/commands/discover",
+            json={"container_id": "abc123"},
+            headers=headers,
+        )
         assert second.status_code == 200
         payload = second.json()
         assert payload["cached"] is True

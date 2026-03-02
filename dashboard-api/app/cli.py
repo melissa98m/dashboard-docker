@@ -76,9 +76,7 @@ def _handle_create_user(argv: list[str]) -> int:
             print(f"Unable to create user: {reason}")
         return 1
 
-    print(
-        f"User created: id={created['id']} username={created['username']} role={created['role']}"
-    )
+    print(f"User created: id={created['id']} username={created['username']} role={created['role']}")
     return 0
 
 
