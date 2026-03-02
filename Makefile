@@ -1,4 +1,4 @@
-.PHONY: build up down restart ps dev logs lint format test test-api test-web test-ci shell-api shell-web migrate purge-audit create-user db-backup clean health-check
+.PHONY: build up down restart ps dev logs lint lint-ci format test test-api test-web test-ci shell-api shell-web migrate purge-audit create-user db-backup clean health-check
 
 ROLE ?= viewer
 
@@ -29,6 +29,10 @@ lint:
 format:
 	docker compose exec dashboard-api ruff format .
 	docker compose exec dashboard-web npm run format
+
+lint-ci:
+	docker compose run --no-deps --rm dashboard-api ruff check . && docker compose run --no-deps --rm dashboard-api mypy .
+	docker compose run --no-deps --rm dashboard-web npm run lint
 
 test: test-api test-web
 

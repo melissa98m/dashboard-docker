@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create minimal .env
+        run: |
+          cp .env.example .env 2>/dev/null || touch .env
+          echo "DATABASE_URL=sqlite:////tmp/dashboard.db" >> .env
+          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
+
+      - name: Lint API + Web
+        run: make lint-ci
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create minimal .env
+        run: |
+          cp .env.example .env 2>/dev/null || touch .env
+          echo "DATABASE_URL=sqlite:////tmp/dashboard.db" >> .env
+          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
+
+      - name: Run tests
+        run: make test-ci
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create minimal .env
+        run: |
+          cp .env.example .env 2>/dev/null || touch .env
+          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
+
+      - name: Build Docker images
+        run: make build
