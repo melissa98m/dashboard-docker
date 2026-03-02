@@ -1,6 +1,8 @@
 "use client";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Empty string = same-origin (proxy), fixes cross-origin cookie issues
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL === "" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
 const API_KEY_STORAGE_KEY = "dashboard-api-key";
 const AUTH_ERROR_EVENT = "dashboard-auth-error";
 const AUTH_KEY_UPDATED_EVENT = "dashboard-auth-key-updated";
@@ -137,4 +139,76 @@ export async function apiFetch(pathOrUrl: string, init?: RequestInit): Promise<R
 export async function apiJson<T>(pathOrUrl: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(pathOrUrl, init);
   return (await response.json()) as T;
+}
+
+interface SseStreamOptions {
+  onEvent: (eventType: string, data: unknown) => void;
+  onError?: (err: Error) => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * Stream SSE from an API endpoint with credentials and auth headers.
+ * EventSource does not send cookies/headers cross-origin; fetch does.
+ */
+export function streamSse(pathOrUrl: string, options: SseStreamOptions): () => void {
+  const { onEvent, onError, signal } = options;
+  const url = toAbsoluteUrl(pathOrUrl);
+  const controller = new AbortController();
+  const effectiveSignal = signal || controller.signal;
+
+  let mounted = true;
+
+  (async () => {
+    try {
+      const response = await fetch(url, {
+        credentials: "include",
+        headers: buildHeaders(),
+        signal: effectiveSignal,
+      });
+      if (!response.ok) {
+        const detail = await parseError(response);
+        if (shouldEmitAuthEvent(response.status, detail)) emitAuthError(response.status, detail);
+        if (mounted) onError?.(new ApiClientError(detail, response.status));
+        return;
+      }
+      const reader = response.body?.getReader();
+      if (!reader) {
+        if (mounted) onError?.(new Error("No response body"));
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (mounted && !effectiveSignal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        let currentEvent = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && currentEvent && mounted) {
+            try {
+              const data = JSON.parse(line.slice(6)) as unknown;
+              onEvent(currentEvent, data);
+            } catch {
+              /* ignore parse errors */
+            }
+            currentEvent = "";
+          }
+        }
+      }
+    } catch (err) {
+      if (mounted && err instanceof Error && err.name !== "AbortError") {
+        onError?.(err);
+      }
+    }
+  })();
+
+  return () => {
+    mounted = false;
+    controller.abort();
+  };
 }
