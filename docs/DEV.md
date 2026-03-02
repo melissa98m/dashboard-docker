@@ -31,6 +31,7 @@
 - Auth stricte : `AUTH_ENABLED=true` (session cookies + CSRF). Toute l’API requiert une session valide sauf `/api/auth/login` et `/health`.
 - Tune `SSE_MAX_CONNECTIONS` for Raspberry Pi capacity.
 - Alert auto-evaluation runs in background (`ALERT_ENGINE_ENABLED=true`) every `ALERT_POLL_SECONDS`.
+- Event watcher (`EVENT_WATCHER_ENABLED=true`) listens to Docker container die/oom events; on detection, fetches last logs, writes audit, sends ntfy notification with restart link. Optional topic override: `EVENT_WATCHER_NTFY_TOPIC`. Status visible in `GET /api/system/security-status` (`event_watcher_enabled`, `event_watcher_running`).
 - ntfy notifications are optional and only active when `NTFY_BASE_URL` + `NTFY_TOPIC` are set.
 - To enable signed restart action links, set `API_SECRET_KEY` + `PUBLIC_API_URL` (and tune `RESTART_ACTION_TTL_SECONDS`).
 - Restart token endpoint is rate-limited with `RESTART_TOKEN_RATE_LIMIT_WINDOW_SECONDS` / `RESTART_TOKEN_RATE_LIMIT_MAX_ATTEMPTS`.

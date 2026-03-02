@@ -19,7 +19,7 @@ Primary client: mobile browser (responsive UI).
 Responsibilities:
 - Docker integration (list/inspect/start/stop/restart)
 - Metrics collection (CPU/RAM) via Docker Engine API stats stream
-- Container events watcher (start/die/oom/health_status) to detect downtime
+- Container events watcher (die/oom) to detect downtime; fetches last logs and sends ntfy notification with restart link
 - Logs retrieval (last N lines on failure, and on-demand streaming)
 - Command Center:
   - Discover runnable commands per service (scraper)
