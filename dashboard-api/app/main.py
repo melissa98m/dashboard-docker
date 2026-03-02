@@ -13,6 +13,7 @@ from app.db.runtime_settings import apply_runtime_settings, list_runtime_setting
 from app.routers import alerts, audit, auth, commands, container_env, containers, health, system, workflows
 from app.security import get_current_auth_context
 from app.services.alert_engine import AlertEngine
+from app.services.alert_seed import run_seed as seed_default_alert_rules
 from app.services.audit_retention import AuditRetentionService
 from app.services.auth_session_retention import AuthSessionRetentionService
 from app.services.command_retention import CommandRetentionService
@@ -24,6 +25,7 @@ async def lifespan(app: FastAPI):
     migrate()
     ensure_bootstrap_admin()
     apply_runtime_settings(overrides=list_runtime_settings())
+    seed_default_alert_rules()
     app.state.alert_engine = AlertEngine()
     app.state.event_watcher = EventWatcherService()
     app.state.audit_retention_service = AuditRetentionService()

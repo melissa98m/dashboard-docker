@@ -46,6 +46,7 @@ def reset_db(client):
     db_url = os.environ.get("DATABASE_URL", "sqlite:////tmp/dashboard_test.db")
     db_path = db_url.replace("sqlite:///", "")
     with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM alert_debounce_state")
         conn.execute("DELETE FROM alert_cooldowns")
         conn.execute("DELETE FROM alert_rules")
         conn.execute("DELETE FROM executions")

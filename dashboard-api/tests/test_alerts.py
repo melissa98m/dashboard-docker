@@ -1,5 +1,9 @@
 """Alert rules endpoints tests."""
 
+from app.db.alerts import (
+    rule_exists,
+    seed_default_rules_for_containers,
+)
 from app.db.audit import write_audit_log
 from tests.conftest import login_as_admin
 
@@ -313,3 +317,108 @@ def test_alert_history_supports_triggered_by_filter(client):
     auto_items = auto.json()["items"]
     assert len(auto_items) >= 1
     assert all(item["triggered_by"] == "alert-engine" for item in auto_items)
+
+
+def test_rule_exists(client):
+    csrf = login_as_admin(client)
+    headers = {"x-csrf-token": csrf}
+    assert rule_exists("nonexistent", "cpu_percent") is False
+    client.post(
+        "/api/alerts/rules",
+        json={
+            "container_id": "x99",
+            "container_name": "test",
+            "metric_type": "cpu_percent",
+            "threshold": 80,
+            "cooldown_seconds": 300,
+            "enabled": True,
+        },
+        headers=headers,
+    )
+    assert rule_exists("x99", "cpu_percent") is True
+    assert rule_exists("x99", "ram_percent") is False
+
+
+def test_seed_default_rules_for_containers_creates_rules(client):
+    login_as_admin(client)
+    containers = [("c1", "app-one"), ("c2", "app-two")]
+    created = seed_default_rules_for_containers(containers)
+    assert created == 4  # 2 containers × 2 metrics (cpu_percent, ram_percent)
+
+    rules = client.get("/api/alerts/rules").json()
+    assert len(rules) == 4
+    metrics_per_container = {}
+    for r in rules:
+        cid = r["container_id"]
+        metrics_per_container.setdefault(cid, set()).add(r["metric_type"])
+        assert r["threshold"] == 90.0
+        assert r["cooldown_seconds"] == 300
+        assert r["enabled"] is True
+    assert metrics_per_container["c1"] == {"cpu_percent", "ram_percent"}
+    assert metrics_per_container["c2"] == {"cpu_percent", "ram_percent"}
+
+
+def test_seed_default_rules_for_containers_skips_existing(client):
+    csrf = login_as_admin(client)
+    headers = {"x-csrf-token": csrf}
+    client.post(
+        "/api/alerts/rules",
+        json={
+            "container_id": "existing",
+            "container_name": "already-has-rule",
+            "metric_type": "cpu_percent",
+            "threshold": 50,
+            "cooldown_seconds": 300,
+            "enabled": True,
+        },
+        headers=headers,
+    )
+    containers = [("existing", "already-has-rule")]
+    created = seed_default_rules_for_containers(containers)
+    assert created == 1  # only ram_percent created, cpu_percent already exists
+    rules = client.get("/api/alerts/rules").json()
+    assert len(rules) == 2
+    assert [r["metric_type"] for r in rules] == ["cpu_percent", "ram_percent"]
+
+
+def test_alert_seed_run_seed_with_mock_docker(client, monkeypatch):
+    login_as_admin(client)
+
+    class FakeContainer:
+        def __init__(self, short_id: str, name: str) -> None:
+            self.short_id = short_id
+            self.name = name
+
+    def fake_docker_client(*args, **kwargs):
+        class FakeContainers:
+            def list(self):
+                return [
+                    FakeContainer("abc", "container-a"),
+                    FakeContainer("def", "container-b"),
+                ]
+
+        class Fake:
+            containers = FakeContainers()
+
+        return Fake()
+
+    from app.services import alert_seed
+
+    monkeypatch.setattr(alert_seed.docker, "DockerClient", fake_docker_client)
+    created = alert_seed.run_seed()
+    assert created == 4
+    rules = client.get("/api/alerts/rules").json()
+    assert len(rules) == 4
+
+
+def test_alert_seed_run_seed_docker_unavailable(client, monkeypatch):
+    import docker
+
+    def fail(*args, **kwargs):
+        raise docker.errors.DockerException("Connection refused")
+
+    from app.services import alert_seed
+
+    monkeypatch.setattr(alert_seed.docker, "DockerClient", fail)
+    created = alert_seed.run_seed()
+    assert created == 0
