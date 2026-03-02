@@ -67,6 +67,7 @@ def test_run_once_triggers_notification_and_audit(monkeypatch):
     )
     audit_calls: list[dict] = []
     notif_calls: list[dict] = []
+    email_calls: list[dict] = []
     monkeypatch.setattr(
         alert_engine,
         "write_audit_log",
@@ -77,6 +78,11 @@ def test_run_once_triggers_notification_and_audit(monkeypatch):
         "send_ntfy_notification",
         lambda **kwargs: notif_calls.append(kwargs) or True,
     )
+    monkeypatch.setattr(
+        alert_engine,
+        "send_email_notification",
+        lambda **kwargs: email_calls.append(kwargs),
+    )
     previous_public_api = settings.public_api_url
     previous_secret = settings.api_secret_key
     settings.public_api_url = "http://localhost:8000"
@@ -86,6 +92,7 @@ def test_run_once_triggers_notification_and_audit(monkeypatch):
         assert triggered == 3
         assert len(audit_calls) == 3
         assert len(notif_calls) == 3
+        assert len(email_calls) == 3
         assert "action_url" in notif_calls[0]
         assert notif_calls[0]["action_url"] is not None
         assert "/api/containers/restart-by-token?token=" in notif_calls[0]["action_url"]

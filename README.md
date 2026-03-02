@@ -12,7 +12,7 @@ make up
 - **API** : http://localhost:8000
 - **Web** : http://localhost:3000
 - **UI Alertes** : http://localhost:3000/alerts
-- **Workflows act** : http://localhost:3000/workflows (si `ACT_ENABLED=true`)
+- **Workflows act** : dans chaque conteneur (Conteneur → Workflows)
 - **Docs API** : http://localhost:8000/docs
 
 ## Commandes
@@ -90,6 +90,11 @@ Le dashboard s’ouvre alors en plein écran, sans barre d’adresse, comme une 
 - Auth session obligatoire sur toute l’API (sauf login et /health) ; docs `/docs` publiques en dev uniquement
 - Limite de flux live SSE configurable (`SSE_MAX_CONNECTIONS`)
 - Lien de restart signé (TTL court) dans les notifications: configurer `API_SECRET_KEY` + `PUBLIC_API_URL`
+
+### Notifications (alertes)
+
+- **ntfy** : `NTFY_BASE_URL` + `NTFY_TOPIC` pour les push notifications (downtime, seuils CPU/RAM).
+- **Email (Resend)** : `RESEND_API_KEY` + `ALERT_EMAIL_FROM` + `ALERT_EMAIL_TO` pour envoi d’emails sur alertes (style Uptime Robot). Domaine vérifié requis sur [resend.com](https://resend.com).
 
 Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SPEC.md](docs/SPEC.md), [docs/AUTH_OPERATIONS.md](docs/AUTH_OPERATIONS.md) et [docs/CICD.md](docs/CICD.md) (CI/CD).
 

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     event_watcher_ntfy_topic: str | None = None
     ntfy_base_url: str | None = None
     ntfy_topic: str | None = None
+    resend_api_key: str = ""
+    alert_email_from: str = ""
+    alert_email_to: str = ""
     public_api_url: str | None = None
     restart_action_ttl_seconds: int = 300
     restart_token_rate_limit_window_seconds: int = 60

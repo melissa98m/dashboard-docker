@@ -40,6 +40,7 @@ class SecurityStatusResponse(BaseModel):
     event_watcher_enabled: bool
     event_watcher_running: bool
     ntfy_configured: bool
+    email_configured: bool
     restart_action_enabled: bool
     restart_action_ttl_seconds: int
     restart_token_rate_limit_window_seconds: int
@@ -244,6 +245,9 @@ def get_security_status(request: Request, _actor: str = Depends(require_read_acc
             getattr(request.app.state, "event_watcher", None)
         ),
         ntfy_configured=bool(settings.ntfy_base_url and settings.ntfy_topic),
+        email_configured=bool(
+            settings.resend_api_key and settings.alert_email_from and settings.alert_email_to
+        ),
         restart_action_enabled=bool(settings.api_secret_key and settings.public_api_url),
         restart_action_ttl_seconds=settings.restart_action_ttl_seconds,
         restart_token_rate_limit_window_seconds=settings.restart_token_rate_limit_window_seconds,
