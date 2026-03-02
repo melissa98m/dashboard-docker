@@ -9,7 +9,7 @@ from app.config import settings
 from app.db.audit import write_audit_log
 from app.security import create_restart_token
 from app.services.container_logs import snapshot_container_logs
-from app.services.notifications import send_ntfy_notification
+from app.services.notifications import send_email_notification, send_ntfy_notification
 
 logger = logging.getLogger(__name__)
 _EVENTS_OF_INTEREST = ("die", "oom")
@@ -95,14 +95,17 @@ def _handle_container_event(
             pass
 
     topic = settings.event_watcher_ntfy_topic or settings.ntfy_topic
-    sent = send_ntfy_notification(
+    send_ntfy_notification(
         title=title,
         message=message,
         topic=topic,
         action_url=action_url,
     )
-    if not sent:
-        logger.debug("ntfy notification skipped for container %s", container_id)
+    send_email_notification(
+        subject=title,
+        message=message,
+        action_url=action_url,
+    )
 
 
 def _events_loop(stop_event: threading.Event) -> None:

@@ -42,6 +42,9 @@ def test_security_status_exposes_non_sensitive_flags(client):
     previous_auth_enabled = settings.auth_enabled
     previous_auth_retention_auto = settings.auth_session_retention_auto_enabled
     previous_auth_retention_poll = settings.auth_session_retention_poll_seconds
+    previous_resend_key = settings.resend_api_key
+    previous_email_from = settings.alert_email_from
+    previous_email_to = settings.alert_email_to
     try:
         settings.auth_enabled = True
         settings.auth_session_retention_auto_enabled = True
@@ -66,6 +69,16 @@ def test_security_status_exposes_non_sensitive_flags(client):
         assert data["read_auth_configured"] is True
         assert data["restart_action_enabled"] is True
         assert data["ntfy_configured"] is True
+        assert data["email_configured"] is False
+        settings.resend_api_key = "re_test"
+        settings.alert_email_from = "alerts@test.com"
+        settings.alert_email_to = "admin@test.com"
+        response2 = client.get("/api/system/security-status")
+        assert response2.status_code == 200
+        assert response2.json()["email_configured"] is True
+        settings.resend_api_key = ""
+        settings.alert_email_from = ""
+        settings.alert_email_to = ""
         assert data["auth_session_retention_auto_enabled"] is True
         assert isinstance(data["auth_session_retention_running"], bool)
         assert data["auth_session_retention_poll_seconds"] == 1800
@@ -128,6 +141,9 @@ def test_security_status_exposes_non_sensitive_flags(client):
         settings.log_snapshot_redaction_extra_patterns = previous_log_extra
         settings.auth_enabled = previous_auth_enabled
         settings.auth_session_retention_auto_enabled = previous_auth_retention_auto
+        settings.resend_api_key = previous_resend_key
+        settings.alert_email_from = previous_email_from
+        settings.alert_email_to = previous_email_to
         settings.auth_session_retention_poll_seconds = previous_auth_retention_poll
 
 

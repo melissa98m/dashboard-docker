@@ -11,7 +11,7 @@ from app.config import settings
 from app.db.alerts import evaluate_rules
 from app.db.audit import write_audit_log
 from app.security import create_restart_token
-from app.services.notifications import send_ntfy_notification
+from app.services.notifications import send_email_notification, send_ntfy_notification
 
 logger = logging.getLogger(__name__)
 
@@ -76,17 +76,21 @@ def _notify_trigger(
         except ValueError:
             action_url = None
     threshold_label = f"{threshold:.2f}" if threshold is not None else "n/a"
-    sent = send_ntfy_notification(
+    msg = (
+        f"{metric_type} threshold exceeded on {container_name}: "
+        f"value={value:.2f}, threshold={threshold_label}"
+    )
+    send_ntfy_notification(
         title=f"Alert: {container_name}",
-        message=(
-            f"{metric_type} threshold exceeded on {container_name}: "
-            f"value={value:.2f}, threshold={threshold_label}"
-        ),
+        message=msg,
         topic=topic,
         action_url=action_url,
     )
-    if not sent:
-        logger.debug("ntfy notification skipped or failed for %s", container_name)
+    send_email_notification(
+        subject=f"Alert: {container_name}",
+        message=msg,
+        action_url=action_url,
+    )
 
 
 def run_once() -> int:

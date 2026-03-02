@@ -22,6 +22,7 @@ interface SecurityStatus {
   event_watcher_enabled: boolean;
   event_watcher_running: boolean;
   ntfy_configured: boolean;
+  email_configured: boolean;
   restart_action_enabled: boolean;
   restart_action_ttl_seconds: number;
   restart_token_rate_limit_window_seconds: number;
@@ -455,6 +456,10 @@ export default function SettingsPage() {
         <div className="entity-card flex items-center justify-between">
           <span>ntfy configure</span>
           <StateBadge active={status.ntfy_configured} />
+        </div>
+        <div className="entity-card flex items-center justify-between">
+          <span>Email configure (Resend)</span>
+          <StateBadge active={status.email_configured} />
         </div>
         <div className="entity-card flex items-center justify-between">
           <span>Liens signes pour redemarrage</span>
