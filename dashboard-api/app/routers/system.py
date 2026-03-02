@@ -17,8 +17,8 @@ from app.db.runtime_settings import (
     get_runtime_settings_view,
     upsert_runtime_settings,
 )
-from app.routers.containers import get_log_redaction_preview
 from app.security import require_read_access, require_write_access
+from app.services.container_logs import get_log_redaction_preview
 
 router = APIRouter()
 
@@ -37,6 +37,8 @@ class SecurityStatusResponse(BaseModel):
     alert_engine_last_error_reason: str | None
     alert_engine_last_error_at: str | None
     alert_poll_seconds: int
+    event_watcher_enabled: bool
+    event_watcher_running: bool
     ntfy_configured: bool
     restart_action_enabled: bool
     restart_action_ttl_seconds: int
@@ -237,6 +239,10 @@ def get_security_status(request: Request, _actor: str = Depends(require_read_acc
         alert_engine_last_error_reason=_service_last_error_reason(alert_engine),
         alert_engine_last_error_at=_service_last_error_at(alert_engine),
         alert_poll_seconds=settings.alert_poll_seconds,
+        event_watcher_enabled=settings.event_watcher_enabled,
+        event_watcher_running=_service_running(
+            getattr(request.app.state, "event_watcher", None)
+        ),
         ntfy_configured=bool(settings.ntfy_base_url and settings.ntfy_topic),
         restart_action_enabled=bool(settings.api_secret_key and settings.public_api_url),
         restart_action_ttl_seconds=settings.restart_action_ttl_seconds,
