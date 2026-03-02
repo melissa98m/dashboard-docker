@@ -262,6 +262,53 @@ def _discover_composer_scripts(container: Any) -> list[dict[str, Any]]:
     return commands
 
 
+def _discover_python_cli(container: Any) -> list[dict[str, Any]]:
+    """Discover commands from Python CLI modules (e.g. app.cli)."""
+    path, _ = _read_file(container, ["/app/app/cli.py", "app/cli.py"])
+    if path is None:
+        return []
+    cwd = "/app"
+    commands: list[dict[str, Any]] = []
+    for python_bin in ("python", "python3"):
+        code, output = _exec(
+            container,
+            [python_bin, "-m", "app.cli"],
+            workdir=cwd,
+        )
+        # CLI with no args typically exits 1 and prints usage to stdout
+        if code != 0 and not output:
+            continue
+        # Parse "Usage: ... migrate | purge-audit [days] | create-user ..." for subcommands
+        usage_match = re.search(
+            r"Usage:.*?app\.cli\s+([^\n]+)",
+            output,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if not usage_match:
+            continue
+        usage_line = usage_match.group(1)
+        # Extract subcommand names: migrate, purge-audit, create-user (first word of each | block)
+        for part in usage_line.split("|"):
+            part = part.strip()
+            if not part or part.startswith("--") or part.startswith("["):
+                continue
+            first = part.split(None, 1)[0]
+            if not first or "]" in first or ":" in first or first.startswith("<"):
+                continue
+            if first[0].isalnum() and len(first) >= 2:
+                commands.append(
+                    {
+                        "name": f"cli:{first}",
+                        "argv": [python_bin, "-m", "app.cli", first],
+                        "cwd": cwd,
+                        "source": "app.cli",
+                    }
+                )
+        if commands:
+            break
+    return commands
+
+
 def discover_commands(container: Any) -> tuple[str, list[dict[str, Any]]]:
     """Discover runnable commands for one container."""
     service_name = _service_name(container)
@@ -272,6 +319,7 @@ def discover_commands(container: Any) -> tuple[str, list[dict[str, Any]]]:
     discovered.extend(_discover_manage_py(container))
     discovered.extend(_discover_composer_scripts(container))
     discovered.extend(_discover_symfony_console(container))
+    discovered.extend(_discover_python_cli(container))
 
     unique: list[dict[str, Any]] = []
     seen: set[tuple[str, tuple[str, ...]]] = set()
