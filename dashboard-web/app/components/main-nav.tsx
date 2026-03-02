@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const MAIN_LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/commands", label: "Commandes" },
+  { href: "/workflows", label: "Workflows" },
   { href: "/alerts", label: "Alertes" },
   { href: "/audit", label: "Audit" },
   { href: "/settings", label: "Parametres" },

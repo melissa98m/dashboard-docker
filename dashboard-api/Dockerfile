@@ -4,7 +4,9 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sh
 
 COPY dashboard-api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

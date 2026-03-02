@@ -10,7 +10,7 @@ from app.config import settings
 from app.db.auth import ensure_bootstrap_admin
 from app.db.init import migrate
 from app.db.runtime_settings import apply_runtime_settings, list_runtime_settings
-from app.routers import alerts, audit, auth, commands, container_env, containers, health, system
+from app.routers import alerts, audit, auth, commands, container_env, containers, health, system, workflows
 from app.security import get_current_auth_context
 from app.services.alert_engine import AlertEngine
 from app.services.audit_retention import AuditRetentionService
@@ -109,3 +109,4 @@ app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(commands.router, prefix="/api/commands", tags=["commands"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])

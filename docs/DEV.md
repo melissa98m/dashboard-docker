@@ -55,4 +55,5 @@
   - `GET /api/commands/discovered` (liste filtrable/paginée)
   - `POST /api/commands/discovered/{id}/allowlist` (promotion en spec)
 - Lancement direct côté UI: `Valider et lancer` (allowlist puis `POST /api/commands/execute`).
+- **act** (GitHub Actions local): `ACT_ENABLED=true` + volume `.:/workspace`. UI `/workflows` liste les jobs des `.github/workflows/*.yml` et permet d'exécuter un job via `act -j <job>`. Audit `act_job_run`.
 - Discovery applique un cache TTL (`COMMAND_DISCOVERY_CACHE_TTL_SECONDS`), contournable avec `force=true` (UI: case “Scan forcé”).

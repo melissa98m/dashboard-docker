@@ -12,6 +12,7 @@ make up
 - **API** : http://localhost:8000
 - **Web** : http://localhost:3000
 - **UI Alertes** : http://localhost:3000/alerts
+- **Workflows act** : http://localhost:3000/workflows (si `ACT_ENABLED=true`)
 - **Docs API** : http://localhost:8000/docs
 
 ## Commandes
