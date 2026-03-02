@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 import threading
 import time
 from collections import deque
@@ -24,64 +23,13 @@ from app.security import (
     require_write_access,
     verify_restart_token,
 )
+from app.services.container_logs import snapshot_container_logs
 
 router = APIRouter()
 _SSE_SEMAPHORE = threading.BoundedSemaphore(value=settings.sse_max_connections)
 _TOKEN_RATE_LIMIT_LOCK = threading.Lock()
 _TOKEN_RATE_LIMIT_ATTEMPTS: dict[str, deque[float]] = {}
 logger = logging.getLogger(__name__)
-_MAX_LOG_SNAPSHOT_LINES = 200
-_REDACTED = "[REDACTED]"
-_EMAIL_REDACTED = "[EMAIL_REDACTED]"
-_DEFAULT_LOG_REDACTION_RULE_NAMES: tuple[str, ...] = (
-    "authorization_bearer",
-    "credential_key_values",
-    "email_addresses",
-)
-
-_DEFAULT_LOG_REDACTION_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (
-        re.compile(r"(?i)\b(authorization\s*:\s*bearer\s+)([^\s]+)"),
-        r"\1[REDACTED]",
-    ),
-    (
-        re.compile(r"(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\b(\s*[:=]\s*)([^\s,;]+)"),
-        r"\1\2[REDACTED]",
-    ),
-    (
-        re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
-        _EMAIL_REDACTED,
-    ),
-)
-
-
-def _load_extra_log_redaction_patterns() -> tuple[re.Pattern[str], ...]:
-    raw = settings.log_snapshot_redaction_extra_patterns.strip()
-    if not raw:
-        return ()
-    compiled: list[re.Pattern[str]] = []
-    for chunk in raw.split("||"):
-        candidate = chunk.strip()
-        if not candidate:
-            continue
-        try:
-            compiled.append(re.compile(candidate))
-        except re.error:
-            logger.warning(
-                "Ignoring invalid LOG_SNAPSHOT_REDACTION_EXTRA_PATTERNS regex: %s",
-                candidate,
-            )
-    return tuple(compiled)
-
-
-def get_log_redaction_preview() -> dict[str, Any]:
-    """Return non-sensitive metadata for settings UI."""
-    extra_patterns = _load_extra_log_redaction_patterns()
-    return {
-        "enabled": settings.log_snapshot_redaction_enabled,
-        "default_rules": list(_DEFAULT_LOG_REDACTION_RULE_NAMES),
-        "extra_rules_count": len(extra_patterns),
-    }
 
 
 def _get_client() -> docker.DockerClient:
@@ -158,23 +106,6 @@ def _last_down_reason(state: dict[str, Any]) -> str | None:
     if isinstance(status, str) and status.strip():
         return cast(str, status)
     return None
-
-
-def _snapshot_logs(container: Any, *, tail: int) -> list[str]:
-    safe_tail = max(1, min(tail, _MAX_LOG_SNAPSHOT_LINES))
-    raw_logs = container.logs(tail=safe_tail).decode("utf-8", errors="replace")
-    lines: list[str] = []
-    for line in raw_logs.splitlines():
-        if not line.strip():
-            continue
-        sanitized = line[:1000]
-        if settings.log_snapshot_redaction_enabled:
-            for pattern, replacement in _DEFAULT_LOG_REDACTION_PATTERNS:
-                sanitized = pattern.sub(replacement, sanitized)
-            for pattern in _load_extra_log_redaction_patterns():
-                sanitized = pattern.sub(_REDACTED, sanitized)
-        lines.append(sanitized)
-    return lines
 
 
 def _compute_stats_payload(raw: dict[str, Any]) -> dict[str, float]:
@@ -402,7 +333,7 @@ def get_container_detail(
         state = attrs.get("State", {})
         health = state.get("Health", {}) if isinstance(state.get("Health"), dict) else {}
         status = state.get("Status", "unknown")
-        logs = _snapshot_logs(container, tail=tail)
+        logs = snapshot_container_logs(container, tail=tail)
         image = _container_image_ref(container)
         return ContainerDetail(
             id=container.short_id,

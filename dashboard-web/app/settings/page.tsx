@@ -19,6 +19,8 @@ interface SecurityStatus {
   alert_engine_last_error_reason: string | null;
   alert_engine_last_error_at: string | null;
   alert_poll_seconds: number;
+  event_watcher_enabled: boolean;
+  event_watcher_running: boolean;
   ntfy_configured: boolean;
   restart_action_enabled: boolean;
   restart_action_ttl_seconds: number;
@@ -127,6 +129,74 @@ function HealthBadge({ health }: { health: ServiceHealth }) {
     <span className="inline-block px-2 py-1 text-xs rounded bg-slate-600/30 text-slate-300">
       UNKNOWN
     </span>
+  );
+}
+
+type GlobalHealthStatus = "healthy" | "warning" | "degraded";
+
+function computeGlobalHealth(params: {
+  depsOk: boolean;
+  alertHealth: ServiceHealth;
+  auditRetentionHealth: ServiceHealth;
+}): GlobalHealthStatus {
+  const { depsOk, alertHealth, auditRetentionHealth } = params;
+  if (!depsOk) return "degraded";
+  if (alertHealth === "warning" || auditRetentionHealth === "warning") return "warning";
+  return "healthy";
+}
+
+function GlobalHealthBadge({ status }: { status: GlobalHealthStatus }) {
+  if (status === "healthy") {
+    return (
+      <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600/25 text-emerald-300 border border-emerald-500/40">
+        <span className="size-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+        Opérationnel
+      </span>
+    );
+  }
+  if (status === "warning") {
+    return (
+      <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-amber-600/25 text-amber-300 border border-amber-500/40">
+        <span className="size-2 rounded-full bg-amber-400" aria-hidden />
+        Dégradé partiel
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600/25 text-red-300 border border-red-500/40">
+      <span className="size-2 rounded-full bg-red-400" aria-hidden />
+      Problèmes critiques
+    </span>
+  );
+}
+
+function DepCheckRow({
+  label,
+  ok,
+  detail,
+}: {
+  label: string;
+  ok: boolean;
+  detail: string;
+}) {
+  return (
+    <div className="entity-card flex items-center justify-between gap-4">
+      <span className="truncate">{label}</span>
+      <div className="flex items-center gap-2 shrink-0 min-w-0">
+        <span className="text-xs text-slate-400 truncate max-w-[10rem] sm:max-w-[16rem]" title={detail}>
+          {detail}
+        </span>
+        <span
+          className={
+            ok
+              ? "inline-block px-2 py-1 text-xs rounded bg-emerald-600/30 text-emerald-300 shrink-0"
+              : "inline-block px-2 py-1 text-xs rounded bg-red-600/30 text-red-300 shrink-0"
+          }
+        >
+          {ok ? "OK" : "KO"}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -277,6 +347,11 @@ export default function SettingsPage() {
     consecutiveErrors: status.audit_retention_consecutive_errors,
     pollSeconds: status.audit_retention_poll_seconds,
   });
+  const globalHealth = computeGlobalHealth({
+    depsOk: deps?.ok ?? false,
+    alertHealth,
+    auditRetentionHealth,
+  });
 
   return (
     <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
@@ -287,6 +362,62 @@ export default function SettingsPage() {
           <Link href="/">Dashboard</Link>
         </div>
       </div>
+
+      <section
+        className={`panel space-y-4 border-2 ${
+          globalHealth === "healthy"
+            ? "border-emerald-500/30"
+            : globalHealth === "warning"
+              ? "border-amber-500/30"
+              : "border-red-500/30"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="font-semibold text-lg">Santé globale</h2>
+          <div className="flex flex-wrap items-center gap-4">
+            <GlobalHealthBadge status={globalHealth} />
+            <span className="text-sm text-slate-400">
+              Uptime API · {formatDuration(uptimeSeconds)}
+            </span>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+              Dépendances
+            </h3>
+            {deps ? (
+              <>
+                <DepCheckRow
+                  label="Docker"
+                  ok={deps.checks.docker.ok}
+                  detail={deps.checks.docker.detail ?? "n/a"}
+                />
+                <DepCheckRow
+                  label="SQLite"
+                  ok={deps.checks.sqlite.ok}
+                  detail={deps.checks.sqlite.detail ?? "n/a"}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">Chargement…</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+              Services
+            </h3>
+            <div className="entity-card flex items-center justify-between">
+              <span>Moteur d&apos;alertes</span>
+              <HealthBadge health={alertHealth} />
+            </div>
+            <div className="entity-card flex items-center justify-between">
+              <span>Purge retention audit</span>
+              <HealthBadge health={auditRetentionHealth} />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="panel space-y-3">
         <div className="entity-card flex items-center justify-between">
@@ -312,6 +443,14 @@ export default function SettingsPage() {
         <div className="entity-card flex items-center justify-between">
           <span>Sante moteur d&apos;alertes</span>
           <HealthBadge health={alertHealth} />
+        </div>
+        <div className="entity-card flex items-center justify-between">
+          <span>Event watcher (die/oom)</span>
+          <StateBadge active={status.event_watcher_enabled} />
+        </div>
+        <div className="entity-card flex items-center justify-between">
+          <span>Event watcher (etat runtime)</span>
+          <StateBadge active={status.event_watcher_running} />
         </div>
         <div className="entity-card flex items-center justify-between">
           <span>ntfy configure</span>
@@ -571,9 +710,7 @@ export default function SettingsPage() {
       )}
 
       <section className="panel space-y-2 text-sm">
-        <p>Sante globale dependances: {deps?.ok ? "ok" : "degradee"}</p>
-        <p>Dependance Docker: {deps?.checks.docker.ok ? "ok" : "ko"} ({deps?.checks.docker.detail ?? "n/a"})</p>
-        <p>Dependance SQLite: {deps?.checks.sqlite.ok ? "ok" : "ko"} ({deps?.checks.sqlite.detail ?? "n/a"})</p>
+        <h2 className="font-semibold mb-2">Détails techniques</h2>
         <p>Connexions SSE max: {status.sse_max_connections}</p>
         <p>Intervalle polling alertes: {status.alert_poll_seconds}s</p>
         <p>TTL token redemarrage: {status.restart_action_ttl_seconds}s</p>

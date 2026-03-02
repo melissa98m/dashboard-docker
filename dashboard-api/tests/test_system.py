@@ -84,6 +84,10 @@ def test_security_status_exposes_non_sensitive_flags(client):
         assert data["alert_engine_last_error_at"] is None or isinstance(
             data["alert_engine_last_error_at"], str
         )
+        assert "event_watcher_enabled" in data
+        assert isinstance(data["event_watcher_enabled"], bool)
+        assert "event_watcher_running" in data
+        assert isinstance(data["event_watcher_running"], bool)
         assert data["audit_retention_days"] == 45
         assert data["audit_retention_auto_enabled"] is True
         assert isinstance(data["audit_retention_running"], bool)
