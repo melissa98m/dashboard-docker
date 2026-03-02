@@ -32,10 +32,12 @@ export default function DashboardPage() {
   const confirm = useConfirm();
   const [containers, setContainers] = useState<Container[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingContainerId, setDeletingContainerId] = useState<string | null>(null);
 
-  const fetchContainers = async (): Promise<Container[]> => {
+  const fetchContainers = async (isRefresh = false): Promise<Container[]> => {
+    if (!isRefresh) setLoading(true);
     try {
       const data = await apiJson<Container[]>("/api/containers");
       setContainers(data);
@@ -45,6 +47,7 @@ export default function DashboardPage() {
       return [];
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -120,15 +123,30 @@ export default function DashboardPage() {
       </main>
     );
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    void fetchContainers(true);
+  };
+
   return (
     <main className="page-shell p-4 max-w-4xl mx-auto">
       <div className="page-header mb-6">
         <h1 className="page-title text-2xl font-bold">Conteneurs Docker</h1>
-        <div className="top-nav">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="btn btn-neutral px-3 py-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {refreshing ? "Rafraîchissement…" : "Rafraîchir"}
+          </button>
+          <div className="top-nav">
           <Link href="/commands">Commandes</Link>
           <Link href="/alerts">Alertes</Link>
           <Link href="/audit">Audit</Link>
           <Link href="/settings">Parametres</Link>
+          </div>
         </div>
       </div>
       <ul className="space-y-3">

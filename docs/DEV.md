@@ -15,7 +15,7 @@
 
 ## Standard commands (must exist)
 - Lint: `make lint` (nécessite `make up` pour exec ; test via `run` sans)
-- Tests: `make test`
+- Tests: `make test` ; CI: `make test-ci` (fail-fast, sortie concise)
 - Format: `make format`
 - Build: `make build`
 - Purge audit logs: `make purge-audit`

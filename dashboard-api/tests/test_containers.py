@@ -93,7 +93,7 @@ class FakeContainerManager:
 
     def get(self, container_id: str) -> FakeContainer:
         if container_id != self._container.short_id:
-            raise KeyError("not found")
+            raise docker.errors.NotFound("no such container")
         return self._container
 
 

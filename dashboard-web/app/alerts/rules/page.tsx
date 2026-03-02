@@ -49,6 +49,7 @@ export default function AlertsRulesPage() {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [containers, setContainers] = useState<ContainerOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [reloadingContainers, setReloadingContainers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [containerId, setContainerId] = useState("");
@@ -58,7 +59,9 @@ export default function AlertsRulesPage() {
   const [debounceSamples, setDebounceSamples] = useState("1");
   const [restartingRuleId, setRestartingRuleId] = useState<number | null>(null);
 
-  const loadData = async () => {
+  const loadData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const [rulesData, containersData] = await Promise.all([
         apiJson<AlertRule[]>("/api/alerts/rules"),
@@ -71,11 +74,12 @@ export default function AlertsRulesPage() {
       setError(e instanceof Error ? e.message : "Erreur de chargement");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    void loadData();
+    void loadData(false);
   }, []);
 
   const reloadContainers = async () => {
@@ -112,7 +116,7 @@ export default function AlertsRulesPage() {
       setThreshold("80");
       setCooldownSeconds("300");
       setDebounceSamples("1");
-      await loadData();
+      await loadData(true);
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Erreur");
     }
@@ -123,7 +127,7 @@ export default function AlertsRulesPage() {
       await apiFetch(`/api/alerts/rules/${id}`, {
         method: "DELETE",
       });
-      await loadData();
+      await loadData(true);
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Erreur");
     }
@@ -147,9 +151,19 @@ export default function AlertsRulesPage() {
     <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
       <div className="page-header">
         <h1 className="page-title text-2xl font-bold">Regles d&apos;alertes</h1>
-        <div className="top-nav">
-          <Link href="/alerts/history">Historique</Link>
-          <Link href="/alerts">Accueil alertes</Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void loadData(true)}
+            disabled={loading || refreshing}
+            className="btn btn-neutral px-3 py-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {refreshing ? "Rafraîchissement…" : loading ? "Chargement…" : "Rafraîchir"}
+          </button>
+          <div className="top-nav">
+            <Link href="/alerts/history">Historique</Link>
+            <Link href="/alerts">Accueil alertes</Link>
+          </div>
         </div>
       </div>
 

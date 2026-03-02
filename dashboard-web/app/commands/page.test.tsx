@@ -138,7 +138,7 @@ describe("Commands live page stream reconnect flow", () => {
     }
     await flush();
 
-    expect(container.textContent).toContain("état: error");
+    expect(container.textContent).toContain("etat: error");
     const reconnectButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Reconnecter")
     );

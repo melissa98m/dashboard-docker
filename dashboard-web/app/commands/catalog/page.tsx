@@ -66,27 +66,34 @@ export default function CommandsCatalogPage() {
   const [argv, setArgv] = useState("");
   const [cwd, setCwd] = useState("");
   const [commandSearch, setCommandSearch] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const discoveredUrl = discoveredContainerFilter
     ? `/api/commands/discovered?container_id=${encodeURIComponent(discoveredContainerFilter)}&limit=200`
     : "/api/commands/discovered?limit=200";
 
-  const loadData = useCallback(async () => {
-    try {
-      const [specsPayload, discoveredPayload, containersData] = await Promise.all([
-        apiJson<CommandSpec[]>("/api/commands/specs"),
-        apiJson<DiscoveredCommand[]>(discoveredUrl),
-        fetchContainersWithRetry(),
-      ]);
-      setSpecs(Array.isArray(specsPayload) ? specsPayload : []);
-      setDiscoveredCommands(Array.isArray(discoveredPayload) ? discoveredPayload : []);
-      setContainers(containersData);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
-    }
-  }, [discoveredUrl]);
+  const loadData = useCallback(
+    async (isManualRefresh = false) => {
+      if (isManualRefresh) setRefreshing(true);
+      try {
+        const [specsPayload, discoveredPayload, containersData] = await Promise.all([
+          apiJson<CommandSpec[]>("/api/commands/specs"),
+          apiJson<DiscoveredCommand[]>(discoveredUrl),
+          fetchContainersWithRetry(),
+        ]);
+        setSpecs(Array.isArray(specsPayload) ? specsPayload : []);
+        setDiscoveredCommands(Array.isArray(discoveredPayload) ? discoveredPayload : []);
+        setContainers(containersData);
+        setError(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erreur");
+      } finally {
+        if (isManualRefresh) setRefreshing(false);
+      }
+    },
+    [discoveredUrl]
+  );
 
   useEffect(() => {
     void loadData();
@@ -214,9 +221,19 @@ export default function CommandsCatalogPage() {
     <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
       <div className="page-header">
         <h1 className="page-title text-2xl font-bold">Catalogue de commandes</h1>
-        <div className="top-nav">
-          <Link href="/commands/live">Terminal live</Link>
-          <Link href="/commands/history">Historique</Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void loadData(true)}
+            disabled={refreshing}
+            className="btn btn-neutral px-3 py-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {refreshing ? "Rafraîchissement…" : "Rafraîchir"}
+          </button>
+          <div className="top-nav">
+            <Link href="/commands/live">Terminal live</Link>
+            <Link href="/commands/history">Historique</Link>
+          </div>
         </div>
       </div>
 

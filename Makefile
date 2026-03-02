@@ -1,4 +1,4 @@
-.PHONY: build up down restart ps dev logs lint format test test-api test-web shell-api shell-web migrate purge-audit create-user db-backup clean health-check
+.PHONY: build up down restart ps dev logs lint format test test-api test-web test-ci shell-api shell-web migrate purge-audit create-user db-backup clean health-check
 
 ROLE ?= viewer
 
@@ -36,6 +36,14 @@ test-api:
 	docker compose run --no-deps --rm dashboard-api pytest -v
 
 test-web:
+	docker compose run --no-deps --rm dashboard-web npm run test
+
+test-ci: test-api-ci test-web-ci
+
+test-api-ci:
+	docker compose run --no-deps --rm dashboard-api pytest -v -x --tb=short -q
+
+test-web-ci:
 	docker compose run --no-deps --rm dashboard-web npm run test
 
 shell-api:
