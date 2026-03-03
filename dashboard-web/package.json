@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "next": "14.2.18",
@@ -26,6 +28,7 @@
     "jsdom": "^24",
     "prettier": "^3",
     "typescript": "^5",
-    "vitest": "^2"
+    "vitest": "^2",
+    "@playwright/test": "^1.49"
   }
 }

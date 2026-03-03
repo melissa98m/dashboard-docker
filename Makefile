@@ -1,4 +1,4 @@
-.PHONY: build up down restart ps dev logs lint lint-ci format test test-api test-web test-ci shell-api shell-web migrate purge-audit create-user db-backup clean health-check
+.PHONY: build up down restart ps dev logs lint lint-ci format format-check test test-api test-web test-ci test-e2e shell-api shell-web migrate purge-audit create-user db-backup clean health-check
 
 ROLE ?= viewer
 
@@ -30,9 +30,13 @@ format:
 	docker compose exec dashboard-api ruff format .
 	docker compose exec dashboard-web npm run format
 
+format-check:
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api ruff format --check .
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run format:check
+
 lint-ci:
-	docker compose run --no-deps --rm dashboard-api ruff check . && docker compose run --no-deps --rm dashboard-api mypy .
-	docker compose run --no-deps --rm dashboard-web npm run lint
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api ruff check . && docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api mypy .
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run lint
 
 test: test-api test-web
 
@@ -40,15 +44,19 @@ test-api:
 	docker compose run --no-deps --rm dashboard-api pytest -v
 
 test-web:
-	docker compose run --no-deps --rm dashboard-web npm run test
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run test
 
 test-ci: test-api-ci test-web-ci
 
 test-api-ci:
-	docker compose run --no-deps --rm dashboard-api pytest -v -x --tb=short -q
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api pytest -v -x --tb=short -q
 
 test-web-ci:
-	docker compose run --no-deps --rm dashboard-web npm run test
+	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run test
+
+test-e2e:
+	@echo "Prerequisite: make up. First run: cd dashboard-web && npm install && npx playwright install chromium"
+	cd dashboard-web && npm run test:e2e
 
 shell-api:
 	docker compose exec dashboard-api sh

@@ -6,6 +6,9 @@ __pycache__/
 .venv/
 node_modules/
 .next/
+test-results/
+playwright-report/
+playwright/.cache/
 .DS_Store
 .cursor/rules/00-core-vibe-coding.mdc
 .gitignore
