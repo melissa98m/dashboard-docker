@@ -31,7 +31,7 @@ def send_email_notification(
         import resend
 
         resend.api_key = api_key
-        params: dict = {
+        params: resend.Emails.SendParams = {
             "from": from_addr,
             "to": to_list,
             "subject": subject,

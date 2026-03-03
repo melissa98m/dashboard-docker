@@ -102,9 +102,7 @@ def ensure_bootstrap_admin() -> None:
         return
     now = _now_iso()
     with sqlite3.connect(get_db_path()) as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
+        existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing is not None:
             return
         conn.execute(

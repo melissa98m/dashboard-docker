@@ -4,14 +4,19 @@ import json
 import logging
 import threading
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.db.audit import write_audit_log
 from app.security import require_read_access, require_write_access
-from app.services.act_runner import is_act_available, list_workflow_jobs, run_act_job
+from app.services.act_runner import (
+    get_workflows_path,
+    is_act_available,
+    list_workflow_jobs,
+    run_act_job,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,26 +38,67 @@ def _sse_event(event_type: str, data: dict | str) -> str:
 
 
 @router.get("/", response_model=list[dict])
-def list_workflows(_actor: str = Depends(require_read_access)):
-    """List workflow jobs from .github/workflows. Returns [{workflow, workflow_file, job}]."""
+def list_workflows(
+    container_id: str | None = Query(default=None, alias="container_id"),
+    _actor: str = Depends(require_read_access),
+):
+    """List workflow jobs. Use container_id to get workflows from a container, else default path."""
     _ensure_act_enabled()
-    jobs = list_workflow_jobs(settings.act_workflows_path)
+    try:
+        base_path = get_workflows_path(container_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    jobs = list_workflow_jobs(base_path)
     return jobs
+
+
+@router.get("/content")
+def get_workflow_content(
+    workflow_file: str = Query(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_.-]+$"),
+    container_id: str | None = Query(default=None, alias="container_id"),
+    _actor: str = Depends(require_read_access),
+):
+    """Return raw YAML content of a workflow file."""
+    _ensure_act_enabled()
+    try:
+        base_path = get_workflows_path(container_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    from pathlib import Path
+
+    wf_path = Path(base_path) / ".github" / "workflows" / workflow_file
+    if not wf_path.exists() or not wf_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Workflow file not found: {workflow_file}")
+    try:
+        return {"content": wf_path.read_text(encoding="utf-8", errors="replace")}
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 class RunJobRequest(BaseModel):
     job: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
     workflow_file: str | None = Field(default=None, max_length=128, pattern=r"^[a-zA-Z0-9_.-]+$")
+    container_id: str | None = Field(default=None, max_length=128)
 
 
 @router.post("/run")
 def run_job(request: RunJobRequest, actor: str = Depends(require_write_access)):
-    """Run a workflow job via act. Streams output as SSE."""
+    """Run a workflow job via act. Streams output as SSE.
+    Use container_id for per-container workflows."""
     _ensure_act_enabled()
+    try:
+        base_path = get_workflows_path(request.container_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    jobs = list_workflow_jobs(settings.act_workflows_path)
+    jobs = list_workflow_jobs(base_path)
     if request.workflow_file:
-        matching = [j for j in jobs if j["workflow_file"] == request.workflow_file and j["job"] == request.job]
+        matching = [
+            j
+            for j in jobs
+            if j["workflow_file"] == request.workflow_file and j["job"] == request.job
+        ]
     else:
         matching = [j for j in jobs if j["job"] == request.job]
     if not matching:
@@ -78,7 +124,7 @@ def run_job(request: RunJobRequest, actor: str = Depends(require_write_access)):
     def event_stream():
         try:
             proc = run_act_job(
-                settings.act_workflows_path,
+                base_path,
                 chosen["job"],
                 workflow_file=chosen["workflow_file"],
             )

@@ -241,9 +241,7 @@ def get_security_status(request: Request, _actor: str = Depends(require_read_acc
         alert_engine_last_error_at=_service_last_error_at(alert_engine),
         alert_poll_seconds=settings.alert_poll_seconds,
         event_watcher_enabled=settings.event_watcher_enabled,
-        event_watcher_running=_service_running(
-            getattr(request.app.state, "event_watcher", None)
-        ),
+        event_watcher_running=_service_running(getattr(request.app.state, "event_watcher", None)),
         ntfy_configured=bool(settings.ntfy_base_url and settings.ntfy_topic),
         email_configured=bool(
             settings.resend_api_key and settings.alert_email_from and settings.alert_email_to

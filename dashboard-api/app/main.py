@@ -10,7 +10,17 @@ from app.config import settings
 from app.db.auth import ensure_bootstrap_admin
 from app.db.init import migrate
 from app.db.runtime_settings import apply_runtime_settings, list_runtime_settings
-from app.routers import alerts, audit, auth, commands, container_env, containers, health, system, workflows
+from app.routers import (
+    alerts,
+    audit,
+    auth,
+    commands,
+    container_env,
+    containers,
+    health,
+    system,
+    workflows,
+)
 from app.security import get_current_auth_context
 from app.services.alert_engine import AlertEngine
 from app.services.alert_seed import run_seed as seed_default_alert_rules

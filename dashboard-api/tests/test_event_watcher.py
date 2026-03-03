@@ -71,9 +71,7 @@ def test_handle_container_event_die_triggers_audit_and_notification(
         assert len(ntfy_calls) == 1
         assert "test-container" in ntfy_calls[0]["title"]
         assert "die" in ntfy_calls[0]["message"] or "exit_code" in ntfy_calls[0]["message"]
-        assert "/api/containers/restart-by-token?token=" in str(
-            ntfy_calls[0].get("action_url", "")
-        )
+        assert "/api/containers/restart-by-token?token=" in str(ntfy_calls[0].get("action_url", ""))
         assert len(email_calls) == 1
         assert "test-container" in email_calls[0]["subject"]
         logs = list_audit_logs(limit=5)
