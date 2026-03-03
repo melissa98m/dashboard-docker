@@ -1,7 +1,5 @@
 """Tests for act workflows API."""
 
-import pytest
-
 from app.config import settings
 from app.services.act_runner import list_workflow_jobs
 
