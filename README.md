@@ -29,6 +29,7 @@ make up
 | `make lint` | Lint API + web |
 | `make lint-ci` | Lint mode CI (sans services démarrés) |
 | `make format` | Formatage du code |
+| `make format-check` | Vérifie le format (CI, sans modification) |
 | `make test` | Tests API + web |
 | `make test-ci` | Tests mode CI (fail-fast, sortie concise) |
 | `make migrate` | Applique les migrations SQLite |
@@ -91,12 +92,35 @@ Le dashboard s’ouvre alors en plein écran, sans barre d’adresse, comme une 
 - Limite de flux live SSE configurable (`SSE_MAX_CONNECTIONS`)
 - Lien de restart signé (TTL court) dans les notifications: configurer `API_SECRET_KEY` + `PUBLIC_API_URL`
 
+### Règles d'alerte par défaut
+
+Au démarrage, des règles essentielles sont créées automatiquement pour chaque conteneur en cours d'exécution :
+
+- **CPU** : seuil 90 %
+- **RAM** : seuil 90 %
+
+Elles sont créées uniquement si aucune règle n'existe déjà. Modifiables via l'écran `/alerts`.
+
 ### Notifications (alertes)
 
 - **ntfy** : `NTFY_BASE_URL` + `NTFY_TOPIC` pour les push notifications (downtime, seuils CPU/RAM).
-- **Email (Resend)** : `RESEND_API_KEY` + `ALERT_EMAIL_FROM` + `ALERT_EMAIL_TO` pour envoi d’emails sur alertes (style Uptime Robot). Domaine vérifié requis sur [resend.com](https://resend.com).
+- **Email (Resend)** : `RESEND_API_KEY` + `ALERT_EMAIL_FROM` + `ALERT_EMAIL_TO` pour envoi d'emails sur alertes (style Uptime Robot). Domaine vérifié requis sur [resend.com](https://resend.com).
 
-Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SPEC.md](docs/SPEC.md), [docs/AUTH_OPERATIONS.md](docs/AUTH_OPERATIONS.md) et [docs/CICD.md](docs/CICD.md) (CI/CD).
+### Workflows act (GitHub Actions local)
+
+Optionnel : exécuter des jobs GitHub Actions via [act](https://github.com/nektos/act) depuis l'UI (Conteneur → Workflows). Configurer dans `.env` :
+- `ACT_ENABLED=true` pour activer
+- `ACT_WORKFLOWS_PATH=/workspace` (chemin vers le repo avec `.github/workflows`, monté par défaut via `.:/workspace`)
+
+Voir :
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture et flux
+- [docs/SPEC.md](docs/SPEC.md) — spécification fonctionnelle
+- [docs/AUTH_OPERATIONS.md](docs/AUTH_OPERATIONS.md) — auth et exploitation
+- [docs/CICD.md](docs/CICD.md) — CI/CD et déploiement
+- [docs/DEV.md](docs/DEV.md) — conventions dev et commandes
+- [docs/SECURITY.md](docs/SECURITY.md) — règles sécurité
+- [docs/RGPD.md](docs/RGPD.md) — RGPD et données personnelles
+- [CHANGELOG.md](CHANGELOG.md) — historique des versions
 
 ## Données persistantes (utilisateurs, etc.)
 

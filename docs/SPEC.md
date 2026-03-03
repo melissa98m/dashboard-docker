@@ -1,4 +1,4 @@
-﻿# SPEC — Raspberry Pi Docker Dashboard (v1)
+# SPEC — Raspberry Pi Docker Dashboard (v1)
 
 ## Must-have
 - Responsive UI (phone first)
@@ -21,8 +21,9 @@
   - show history
 
 ## Nice-to-have
-- PWA install + push
-- GitHub Actions local run button via `act`
+- PWA install — **implémenté** : manifest, standalone, installable sur mobile
+- Push notifications (alertes) via ntfy / Resend — **implémenté** : downtime + seuils CPU/RAM ; pas de Web Push navigateur
+- GitHub Actions local run via `act` — **implémenté** : UI dans Conteneur → Workflows, `ACT_ENABLED=true`
 
 ## Acceptance criteria
 - No arbitrary shell execution from user input
