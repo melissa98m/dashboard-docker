@@ -85,16 +85,20 @@ class FakeContainer:
 
 
 class FakeContainerManager:
-    def __init__(self, container: FakeContainer) -> None:
+    def __init__(
+        self, container: FakeContainer, extra_containers: list[FakeContainer] | None = None
+    ) -> None:
         self._container = container
+        self._all = [container] + (extra_containers or [])
 
     def list(self, all: bool = True):  # noqa: A002
-        return [self._container]
+        return self._all
 
     def get(self, container_id: str) -> FakeContainer:
-        if container_id != self._container.short_id:
-            raise docker.errors.NotFound("no such container")
-        return self._container
+        for c in self._all:
+            if c.short_id == container_id:
+                return c
+        raise docker.errors.NotFound("no such container")
 
 
 class FakeDockerClient:
@@ -139,6 +143,161 @@ def test_list_containers_with_missing_image_metadata(client, monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload[0]["image"] == "dashboard-web:local"
+
+
+def test_list_containers_filter_status_running(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    running = FakeContainer()
+    exited = FakeContainer()
+    exited.short_id = "xyz789"
+    exited.name = "stopped"
+    exited.attrs = {
+        "State": {
+            "Status": "exited",
+            "StartedAt": "2026-01-01T00:00:00Z",
+            "FinishedAt": "2026-01-02T00:00:00Z",
+            "ExitCode": 0,
+            "OOMKilled": False,
+            "Error": "",
+        }
+    }
+    manager = FakeContainerManager(running, [exited])
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: type("Client", (), {"containers": manager})(),
+    )
+    response = client.get("/api/containers?status=running")
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["status"] == "running"
+    assert payload[0]["name"] == "demo"
+
+
+def test_list_containers_filter_status_exited(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    running = FakeContainer()
+    exited = FakeContainer()
+    exited.short_id = "xyz789"
+    exited.name = "stopped"
+    exited.attrs = {
+        "State": {
+            "Status": "exited",
+            "StartedAt": "2026-01-01T00:00:00Z",
+            "FinishedAt": "2026-01-02T00:00:00Z",
+            "ExitCode": 0,
+            "OOMKilled": False,
+            "Error": "",
+        }
+    }
+    manager = FakeContainerManager(running, [exited])
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: type("Client", (), {"containers": manager})(),
+    )
+    response = client.get("/api/containers?status=exited")
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["status"] == "exited"
+    assert payload[0]["name"] == "stopped"
+
+
+def test_list_containers_filter_status_invalid(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers?status=invalid")
+    assert response.status_code == 422
+
+
+def test_bulk_start_containers(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    csrf = login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.post(
+        "/api/containers/bulk/start",
+        json={"ids": ["abc123"]},
+        headers={"x-csrf-token": csrf},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert data["succeeded"] == ["abc123"]
+    assert data["failed"] == []
+    assert fake.started is True
+
+
+def test_bulk_stop_containers(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    csrf = login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.post(
+        "/api/containers/bulk/stop",
+        json={"ids": ["abc123"]},
+        headers={"x-csrf-token": csrf},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert data["succeeded"] == ["abc123"]
+
+
+def test_bulk_delete_containers(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    csrf = login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.post(
+        "/api/containers/bulk/delete",
+        json={"ids": ["abc123"], "force": False, "volumes": False},
+        headers={"x-csrf-token": csrf},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert data["succeeded"] == ["abc123"]
+    assert fake.removed is True
+    assert fake.remove_args == {"v": False, "force": False}
+
+
+def test_bulk_too_many_ids(client):
+    csrf = login_as_admin(client)
+    response = client.post(
+        "/api/containers/bulk/start",
+        json={"ids": ["a"] * 21},
+        headers={"x-csrf-token": csrf},
+    )
+    assert response.status_code == 422
 
 
 def test_get_container_detail(client, monkeypatch):

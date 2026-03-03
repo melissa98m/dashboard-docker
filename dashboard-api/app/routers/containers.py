@@ -257,16 +257,50 @@ def _audit_container_action(
     )
 
 
+_BULK_MAX_IDS = 20
+
+
+def _validate_container_ids(ids: list[str]) -> None:
+    if len(ids) > _BULK_MAX_IDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Maximum {_BULK_MAX_IDS} container IDs per bulk request",
+        )
+    for cid in ids:
+        if not isinstance(cid, str) or not cid or len(cid) > 64:
+            raise HTTPException(status_code=422, detail="Invalid container ID")
+        if not all(c.isalnum() or c in "-_" for c in cid):
+            raise HTTPException(status_code=422, detail="Invalid container ID format")
+
+
+class BulkIdsRequest(BaseModel):
+    ids: list[str]
+
+
+class BulkDeleteRequest(BulkIdsRequest):
+    force: bool = False
+    volumes: bool = False
+
+
 @router.get("", response_model=list[ContainerSummary])
-def list_containers():
-    """List all containers (running + stopped)."""
+def list_containers(
+    status: str | None = Query(default=None, description="Filter: 'running' or 'exited'"),
+):
+    """List all containers (running + stopped). Optionally filter by status."""
+    if status is not None and status not in ("running", "exited"):
+        raise HTTPException(status_code=422, detail="status must be 'running' or 'exited'")
     try:
         client = _get_client()
         containers = client.containers.list(all=True)
         result = []
         for c in containers:
             attrs = c.attrs
-            status = attrs.get("State", {}).get("Status", "unknown")
+            c_status = attrs.get("State", {}).get("Status", "unknown")
+            if status is not None:
+                if status == "running" and c_status != "running":
+                    continue
+                if status == "exited" and c_status == "running":
+                    continue
             state = attrs.get("State", {})
             uptime = _uptime_seconds(attrs)
             name = _safe_container_name(c.name)
@@ -276,7 +310,7 @@ def list_containers():
                     id=c.short_id,
                     name=name,
                     image=image,
-                    status=status,
+                    status=c_status,
                     uptime_seconds=uptime,
                     finished_at=_finished_at(state),
                     last_down_reason=_last_down_reason(state),
@@ -285,6 +319,145 @@ def list_containers():
         return result
     except docker.errors.DockerException:
         raise HTTPException(status_code=503, detail="Docker engine unavailable")
+
+
+class BulkActionResult(BaseModel):
+    ok: bool
+    succeeded: list[str]
+    failed: list[dict[str, str]]
+
+
+@router.post("/bulk/start", response_model=BulkActionResult)
+def bulk_start_containers(
+    body: BulkIdsRequest,
+    actor: str = Depends(require_write_access),
+):
+    """Start multiple containers."""
+    _validate_container_ids(body.ids)
+    succeeded: list[str] = []
+    failed: list[dict[str, str]] = []
+    client = _get_client()
+    for cid in body.ids:
+        try:
+            c = client.containers.get(cid)
+            c.start()
+            succeeded.append(cid)
+            _audit_container_action(
+                action="container_start",
+                container_id=cid,
+                actor=actor,
+                result="ok",
+            )
+        except docker.errors.NotFound:
+            failed.append({"id": cid, "reason": "not_found"})
+            _audit_container_action(
+                action="container_start",
+                container_id=cid,
+                actor=actor,
+                result="error",
+                reason="not_found",
+            )
+        except docker.errors.DockerException:
+            failed.append({"id": cid, "reason": "docker_error"})
+            _audit_container_action(
+                action="container_start",
+                container_id=cid,
+                actor=actor,
+                result="error",
+                reason="docker_error",
+            )
+    return BulkActionResult(ok=len(failed) == 0, succeeded=succeeded, failed=failed)
+
+
+@router.post("/bulk/stop", response_model=BulkActionResult)
+def bulk_stop_containers(
+    body: BulkIdsRequest,
+    actor: str = Depends(require_write_access),
+):
+    """Stop multiple containers."""
+    _validate_container_ids(body.ids)
+    succeeded: list[str] = []
+    failed: list[dict[str, str]] = []
+    client = _get_client()
+    for cid in body.ids:
+        try:
+            c = client.containers.get(cid)
+            c.stop()
+            succeeded.append(cid)
+            _audit_container_action(
+                action="container_stop",
+                container_id=cid,
+                actor=actor,
+                result="ok",
+            )
+        except docker.errors.NotFound:
+            failed.append({"id": cid, "reason": "not_found"})
+            _audit_container_action(
+                action="container_stop",
+                container_id=cid,
+                actor=actor,
+                result="error",
+                reason="not_found",
+            )
+        except docker.errors.DockerException:
+            failed.append({"id": cid, "reason": "docker_error"})
+            _audit_container_action(
+                action="container_stop",
+                container_id=cid,
+                actor=actor,
+                result="error",
+                reason="docker_error",
+            )
+    return BulkActionResult(ok=len(failed) == 0, succeeded=succeeded, failed=failed)
+
+
+@router.post("/bulk/delete", response_model=BulkActionResult)
+def bulk_delete_containers(
+    body: BulkDeleteRequest,
+    actor: str = Depends(require_write_access),
+):
+    """Stop and delete multiple containers."""
+    _validate_container_ids(body.ids)
+    succeeded: list[str] = []
+    failed: list[dict[str, str]] = []
+    client = _get_client()
+    for cid in body.ids:
+        try:
+            c = client.containers.get(cid)
+            try:
+                c.stop()
+            except docker.errors.DockerException:
+                pass
+            c.remove(v=body.volumes, force=body.force)
+            succeeded.append(cid)
+            _audit_container_action(
+                action="container_delete",
+                container_id=cid,
+                actor=actor,
+                result="ok",
+                extra={"force": body.force, "volumes": body.volumes},
+            )
+        except docker.errors.NotFound:
+            failed.append({"id": cid, "reason": "not_found"})
+            _audit_container_action(
+                action="container_delete",
+                container_id=cid,
+                actor=actor,
+                result="error",
+                reason="not_found",
+                extra={"force": body.force, "volumes": body.volumes},
+            )
+        except docker.errors.DockerException:
+            failed.append({"id": cid, "reason": "docker_error"})
+            _audit_container_action(
+                action="container_delete",
+                container_id=cid,
+                actor=actor,
+                result="error",
+                reason="docker_error",
+                extra={"force": body.force, "volumes": body.volumes},
+            )
+    return BulkActionResult(ok=len(failed) == 0, succeeded=succeeded, failed=failed)
 
 
 @router.get("/{container_id}/commands/specs", response_model=list[ContainerCommandSpecItem])
