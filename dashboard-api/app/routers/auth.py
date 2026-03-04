@@ -152,7 +152,10 @@ def login(payload: LoginRequest, response: Response):
             mins = settings.auth_lockout_minutes
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Compte temporairement verrouillé (trop de tentatives). Réessayez dans {mins} minutes.",
+                detail=(
+                    f"Compte temporairement verrouillé (trop de tentatives). "
+                    f"Réessayez dans {mins} minutes."
+                ),
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

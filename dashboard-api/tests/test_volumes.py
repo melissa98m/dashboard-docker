@@ -69,9 +69,7 @@ def test_get_volume_detail(client, monkeypatch):
 
     login_as_admin(client)
     fake = FakeVolume(name="my_volume")
-    monkeypatch.setattr(
-        volumes_router, "_get_client", lambda: FakeDockerClient([fake])
-    )
+    monkeypatch.setattr(volumes_router, "_get_client", lambda: FakeDockerClient([fake]))
     response = client.get("/api/volumes/my_volume")
     assert response.status_code == 200
     data = response.json()
@@ -94,9 +92,7 @@ def test_delete_volume(client, monkeypatch):
 
     csrf = login_as_admin(client)
     fake = FakeVolume(name="my_volume")
-    monkeypatch.setattr(
-        volumes_router, "_get_client", lambda: FakeDockerClient([fake])
-    )
+    monkeypatch.setattr(volumes_router, "_get_client", lambda: FakeDockerClient([fake]))
     response = client.delete(
         "/api/volumes/my_volume?force=false",
         headers={"x-csrf-token": csrf},
