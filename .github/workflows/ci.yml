@@ -35,11 +35,8 @@ jobs:
 
   deploy:
     needs: test
-    # Skip when SSH secrets are not configured (avoids "invalid credentials" on PR/fork)
-    if: >
-      ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch')
-      && secrets.SSH_HOST != ''
-      && secrets.SSH_PRIVATE_KEY != ''
+    # Only on push to main or manual trigger (skipped on PR/fork)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
