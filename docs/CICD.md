@@ -2,24 +2,29 @@
 
 ## Vue d'ensemble
 
-- **CI** : lint, tests, build sur chaque push/PR vers `main`
+- **CI + Deploy** : lint, tests, build puis déploiement sur le Raspberry Pi (push sur `main`)
 - **Auto Pull Request** : crée/met à jour une PR à chaque push vers une branche hors `main`
-- **CD** : déploiement sur le Raspberry Pi à chaque push sur `main` (ou manuel)
 
 ## Workflows
 
 | Workflow         | Fichier                            | Déclencheur                     |
 |------------------|-------------------------------------|---------------------------------|
-| CI               | `.github/workflows/ci.yml`          | Push + PR sur `main`            |
+| CI + Deploy      | `.github/workflows/ci.yml`          | Push + PR sur `main` ; deploy uniquement sur push `main` |
 | Auto Pull Request| `.github/workflows/auto-pull-request.yml` | Push branches hors `main`/`master` |
-| Deploy           | `.github/workflows/deploy.yml`      | Push sur `main` + `workflow_dispatch` |
 
 ## CI
 
-Exécute en parallèle :
+Exécute séquentiellement :
 - **Lint** : `make lint-ci` (ruff, mypy, ESLint)
-- **Test** : `make test-ci` (pytest + Vitest)
+- **Format** : `make format-check`
+- **Tests** : `make test-ci` (pytest + Vitest)
 - **Build** : `make build` (images Docker)
+
+## Deploy
+
+Après succès des tests, sur push uniquement vers `main` :
+1. SCP du projet vers le Raspberry Pi
+2. SSH : `docker compose build` (BuildKit désactivé pour compatibilité Pi) puis `docker compose up -d --remove-orphans`
 
 ## Auto Pull Request
 
@@ -46,9 +51,11 @@ Workflow qui crée ou met à jour une PR (corps = messages de commit) à chaque 
 
 | Secret           | Description                                      |
 |------------------|--------------------------------------------------|
-| `DEPLOY_SSH_KEY` | Clé privée SSH pour se connecter au Pi          |
-| `DEPLOY_HOST`    | IP ou hostname du Pi (ex. `192.168.1.10` ou `pi.local`) |
-| `DEPLOY_USER`    | Utilisateur SSH (ex. `pi`)                       |
+| `SSH_HOST`       | IP ou hostname du Pi (ex. `192.168.1.10` ou `pi.local`) |
+| `SSH_USER`       | Utilisateur SSH (ex. `pi`)                       |
+| `SSH_PORT`       | *(optionnel)* Port SSH (défaut 22)              |
+| `SSH_PRIVATE_KEY`| Clé privée SSH pour se connecter au Pi          |
+| `SSH_PASSPHRASE` | *(optionnel)* Passphrase de la clé si protégée  |
 | `DEPLOY_PATH`    | Chemin du projet sur le Pi (ex. `/home/pi/docker-dashboard`) |
 | `REPO_ACCESS_TOKEN` | *(optionnel)* PAT scope `repo` pour Auto Pull Request si 403 |
 
@@ -58,7 +65,7 @@ Workflow qui crée ou met à jour une PR (corps = messages de commit) à chaque 
 ssh-keygen -t ed25519 -C "github-actions-deploy" -f deploy_key -N ""
 ```
 
-- **Clé privée** → secret `DEPLOY_SSH_KEY`
+- **Clé privée** → secret `SSH_PRIVATE_KEY`
 - **Clé publique** (`deploy_key.pub`) → copier dans `~/.ssh/authorized_keys` sur le Pi
 
 ### Premier déploiement manuel sur le Pi
@@ -70,15 +77,16 @@ cd /home/pi/docker-dashboard
 # Copier .env.example en .env et éditer si besoin
 ```
 
-Puis lancer un déploiement depuis GitHub Actions (onglet Actions → Deploy to Raspberry Pi → Run workflow).
+Puis lancer un déploiement depuis GitHub Actions (onglet Actions → CI + Deploy → Run workflow sur la branche `main`).
 
 ### Comportement du déploiement
 
-1. Rsync du code vers le Pi (`.env` et dossiers générés exclus)
-2. Si `.env` absent, copie depuis `.env.example`
-3. `docker compose build` puis `docker compose up -d`
+1. SCP du code vers le Pi (`.env` est gitignored donc jamais envoyé)
+2. Si `.env` absent sur le Pi, copie depuis `.env.example`
+3. `docker compose build --pull` (BuildKit désactivé pour compatibilité Raspberry Pi)
+4. `docker compose up -d --remove-orphans`
 
-**Important** : le fichier `.env` sur le Pi n’est jamais écrasé (production, secrets).
+**Important** : le fichier `.env` sur le Pi n’est jamais écrasé (non versionné).
 
 ## Sécurité
 

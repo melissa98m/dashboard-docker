@@ -17,7 +17,7 @@ services:
       - DATABASE_URL=sqlite:////data/dashboard.db
       - DOCKER_HOST=unix:///var/run/docker.sock
     ports:
-      - "8000:8000"
+      - "${PORT_API:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -39,7 +39,7 @@ services:
       - NEXT_PUBLIC_API_URL=
       - API_UPSTREAM_URL=http://dashboard-api:8000
     ports:
-      - "3000:3000"
+      - "${PORT_WEB:-3000}:3000"
     depends_on:
       dashboard-api:
         condition: service_healthy

@@ -35,7 +35,9 @@ interface EnvApplyResponse {
   warnings: string[];
 }
 
-export async function getContainerEnvProfile(containerId: string): Promise<EnvProfileResponse> {
+export async function getContainerEnvProfile(
+  containerId: string
+): Promise<EnvProfileResponse> {
   return apiJson<EnvProfileResponse>(
     `/api/containers/${encodeURIComponent(containerId)}/env/profile`
   );

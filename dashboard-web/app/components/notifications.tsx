@@ -35,20 +35,25 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback((id: number) => {
     setItems((previous) =>
-      previous.map((item) => (item.id === id ? { ...item, leaving: true } : item))
+      previous.map((item) =>
+        item.id === id ? { ...item, leaving: true } : item
+      )
     );
     window.setTimeout(() => {
       setItems((previous) => previous.filter((item) => item.id !== id));
     }, 170);
   }, []);
 
-  const push = useCallback((message: string, type: NotificationType) => {
-    const id = createId();
-    setItems((previous) => [...previous, { id, message, type }].slice(-5));
-    window.setTimeout(() => {
-      dismiss(id);
-    }, 3600);
-  }, [dismiss]);
+  const push = useCallback(
+    (message: string, type: NotificationType) => {
+      const id = createId();
+      setItems((previous) => [...previous, { id, message, type }].slice(-5));
+      window.setTimeout(() => {
+        dismiss(id);
+      }, 3600);
+    },
+    [dismiss]
+  );
 
   const api = useMemo<NotificationsApi>(
     () => ({
@@ -89,7 +94,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 export function useNotifications(): NotificationsApi {
   const value = useContext(NotificationsContext);
   if (!value) {
-    throw new Error("useNotifications must be used within NotificationsProvider");
+    throw new Error(
+      "useNotifications must be used within NotificationsProvider"
+    );
   }
   return value;
 }

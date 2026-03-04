@@ -8,7 +8,7 @@
 | Frontend | Next.js 14 (React) | App Router, responsive, mobile-first |
 | Base de données | SQLite | Config, règles alertes, audit, historique commandes |
 | Temps réel | SSE | Streaming stats/logs, adapté au Pi |
-| Notifications | ntfy | Self-hosted, boutons d’action |
+| Notifications | ntfy + Resend | ntfy : push self-hosted avec boutons ; Resend : emails (alertes) |
 
 ## Target
 A self-hosted dashboard (LAN/VPN) to monitor and manage Docker containers running on a Raspberry Pi.
@@ -28,7 +28,7 @@ Responsibilities:
 - Alerts:
   - Threshold rules per container (CPU%, RAM MB/%)
   - Debounce + cooldown to prevent spam
-  - Notifications (ntfy webhook) with "Restart" action
+  - Notifications: ntfy (webhook + "Restart" action), Resend (emails on alert)
   - Background alert engine to auto-evaluate Docker stats on interval
 
 Storage:
@@ -45,6 +45,7 @@ Responsibilities:
 - Per-container page: live CPU/RAM, last logs, actions (restart, view logs)
 - Alerts configuration UI (thresholds, cooldown)
 - Command Center UI (discovered commands + execute + logs)
+- Workflows UI: run GitHub Actions jobs locally via act (optional)
 - Mobile-first UX (touch, big targets, fast load)
 
 Real-time:
@@ -65,6 +66,8 @@ Real-time:
 - API exposes recent `alert_triggered` entries from audit log for operational context in `/alerts`.
 6) Discovered command flow
 - API discovers candidate commands per container and requires allowlist promotion before execution.
+7) act (GitHub Actions local, optional)
+- When `ACT_ENABLED=true`, API lists workflows from `.github/workflows` and can run jobs via act. Audit `act_job_run`.
 
 ## Non-goals (v1)
 - Multi-host orchestration

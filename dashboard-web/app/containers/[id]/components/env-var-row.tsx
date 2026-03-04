@@ -23,7 +23,9 @@ export function EnvVarRow({
 }: EnvVarRowProps) {
   return (
     <tr className="border-b border-slate-700">
-      <td className="py-2 pr-2 align-top text-xs text-slate-300 break-all">{envKey}</td>
+      <td className="py-2 pr-2 align-top text-xs text-slate-300 break-all">
+        {envKey}
+      </td>
       <td className="py-2 px-2 align-top">
         <input
           value={value}

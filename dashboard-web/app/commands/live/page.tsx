@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { apiJson } from "../../lib/api-client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiJson, API_BASE_URL } from "../../lib/api-client";
 
 interface Execution {
   id: number;
@@ -27,7 +25,9 @@ interface LiveLine {
 function CommandsLiveContent() {
   const searchParams = useSearchParams();
   const [executions, setExecutions] = useState<Execution[]>([]);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<number | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<number | null>(
+    null
+  );
   const [liveLines, setLiveLines] = useState<LiveLine[]>([]);
   const [liveStatus, setLiveStatus] = useState<string>("idle");
   const [streamSessionNonce, setStreamSessionNonce] = useState(0);
@@ -93,12 +93,15 @@ function CommandsLiveContent() {
     setLiveRetryInMs(null);
 
     const appendLine = (channel: LiveChannel, line: string) => {
-      setLiveLines((previous) => [...previous.slice(-799), { channel, text: line }]);
+      setLiveLines((previous) => [
+        ...previous.slice(-799),
+        { channel, text: line },
+      ]);
     };
 
     const connect = async () => {
       if (stopped) return;
-      let streamUrl = `${API_URL}/api/commands/executions/${selectedExecutionId}/stream`;
+      let streamUrl = `${API_BASE_URL || ""}/api/commands/executions/${selectedExecutionId}/stream`;
       try {
         const payload = await apiJson<{ token: string }>(
           `/api/commands/executions/${selectedExecutionId}/stream-token`
@@ -197,7 +200,8 @@ function CommandsLiveContent() {
 
   const sortedExecutions = useMemo(() => {
     return [...executions].sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+      (a, b) =>
+        new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
     );
   }, [executions]);
 
@@ -266,7 +270,8 @@ function CommandsLiveContent() {
                 )}
               </p>
               <p className="text-xs text-slate-400">
-                {new Date(exec.started_at).toLocaleString()} · {exec.container_id} · par {exec.triggered_by}
+                {new Date(exec.started_at).toLocaleString()} ·{" "}
+                {exec.container_id} · par {exec.triggered_by}
               </p>
               <button
                 type="button"
@@ -277,7 +282,9 @@ function CommandsLiveContent() {
               </button>
             </li>
           ))}
-          {sortedExecutions.length === 0 && <li className="text-xs muted">Aucune execution.</li>}
+          {sortedExecutions.length === 0 && (
+            <li className="text-xs muted">Aucune execution.</li>
+          )}
         </ul>
       </section>
 
@@ -311,7 +318,9 @@ function CommandsLiveContent() {
             <span className="field-label">Filtre flux</span>
             <select
               value={liveFilter}
-              onChange={(e) => setLiveFilter(e.target.value as "all" | LiveChannel)}
+              onChange={(e) =>
+                setLiveFilter(e.target.value as "all" | LiveChannel)
+              }
               disabled={selectedExecutionId == null}
               className="rounded bg-slate-900 px-2 py-1 border border-slate-700 text-xs"
             >
@@ -322,7 +331,9 @@ function CommandsLiveContent() {
               <option value="done">termine</option>
             </select>
           </label>
-          <label className={`field-check${selectedExecutionId == null ? " is-disabled" : ""}`}>
+          <label
+            className={`field-check${selectedExecutionId == null ? " is-disabled" : ""}`}
+          >
             <input
               type="checkbox"
               checked={autoScrollPaused}
@@ -331,22 +342,37 @@ function CommandsLiveContent() {
             />
             Pause auto-scroll
           </label>
-          <button type="button" onClick={scrollLiveToBottom} className="btn btn-neutral px-3 py-1 text-xs">
+          <button
+            type="button"
+            onClick={scrollLiveToBottom}
+            className="btn btn-neutral px-3 py-1 text-xs"
+          >
             Aller en bas
           </button>
-          <button type="button" onClick={clearLiveOutput} className="btn btn-neutral px-3 py-1 text-xs">
+          <button
+            type="button"
+            onClick={clearLiveOutput}
+            className="btn btn-neutral px-3 py-1 text-xs"
+          >
             Nettoyer
           </button>
-          <button type="button" onClick={() => void copyLiveOutput()} className="btn btn-neutral px-3 py-1 text-xs">
+          <button
+            type="button"
+            onClick={() => void copyLiveOutput()}
+            className="btn btn-neutral px-3 py-1 text-xs"
+          >
             Copier
           </button>
-          {copyFeedback && <span className="text-xs text-slate-400">{copyFeedback}</span>}
+          {copyFeedback && (
+            <span className="text-xs text-slate-400">{copyFeedback}</span>
+          )}
         </div>
         <pre
           ref={liveOutputRef}
           className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-64 overflow-auto"
         >
-          {renderedLiveLines.join("\n") || "Aucun flux en temps reel pour le moment."}
+          {renderedLiveLines.join("\n") ||
+            "Aucun flux en temps reel pour le moment."}
         </pre>
       </section>
     </main>
@@ -355,7 +381,11 @@ function CommandsLiveContent() {
 
 export default function CommandsLivePage() {
   return (
-    <Suspense fallback={<main className="page-shell p-4 max-w-4xl mx-auto">Chargement...</main>}>
+    <Suspense
+      fallback={
+        <main className="page-shell p-4 max-w-4xl mx-auto">Chargement...</main>
+      }
+    >
       <CommandsLiveContent />
     </Suspense>
   );

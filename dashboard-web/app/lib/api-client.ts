@@ -1,12 +1,17 @@
 "use client";
 
-// Empty string = same-origin (proxy), fixes cross-origin cookie issues
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL === "" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
+// Empty string = same-origin (proxy), fixes cross-origin cookie issues.
+// Export for EventSource URLs (logs, command streams) so they use same-origin in proxy mode.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL === ""
+    ? ""
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = API_BASE_URL;
 const API_KEY_STORAGE_KEY = "dashboard-api-key";
 const AUTH_ERROR_EVENT = "dashboard-auth-error";
 const AUTH_KEY_UPDATED_EVENT = "dashboard-auth-key-updated";
-const AUTH_CSRF_COOKIE_NAME = process.env.NEXT_PUBLIC_AUTH_CSRF_COOKIE_NAME || "dashboard_csrf";
+const AUTH_CSRF_COOKIE_NAME =
+  process.env.NEXT_PUBLIC_AUTH_CSRF_COOKIE_NAME || "dashboard_csrf";
 
 interface ApiErrorPayload {
   detail?: string;
@@ -56,11 +61,6 @@ function emitAuthError(status: number, detail: string): void {
   );
 }
 
-function isUnsafeMethod(method: string | undefined): boolean {
-  const normalized = (method || "GET").toUpperCase();
-  return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
-}
-
 function getCookieValue(name: string): string {
   if (typeof document === "undefined") return "";
   const prefix = `${encodeURIComponent(name)}=`;
@@ -76,7 +76,9 @@ function buildHeaders(init?: RequestInit): Headers {
   if (apiKey && !headers.has("x-api-key")) {
     headers.set("x-api-key", apiKey);
   }
-  if (isUnsafeMethod(init?.method) && !headers.has("x-csrf-token")) {
+  // Always send CSRF token when available: some GET endpoints (e.g. env/profile) require it
+  // because they use require_write_access for consistency.
+  if (!headers.has("x-csrf-token")) {
     const csrfToken = getCookieValue(AUTH_CSRF_COOKIE_NAME).trim();
     if (csrfToken) {
       headers.set("x-csrf-token", csrfToken);
@@ -119,7 +121,10 @@ export function getAuthKeyUpdatedEventName(): string {
   return AUTH_KEY_UPDATED_EVENT;
 }
 
-export async function apiFetch(pathOrUrl: string, init?: RequestInit): Promise<Response> {
+export async function apiFetch(
+  pathOrUrl: string,
+  init?: RequestInit
+): Promise<Response> {
   const url = toAbsoluteUrl(pathOrUrl);
   const response = await fetch(url, {
     ...init,
@@ -136,7 +141,10 @@ export async function apiFetch(pathOrUrl: string, init?: RequestInit): Promise<R
   return response;
 }
 
-export async function apiJson<T>(pathOrUrl: string, init?: RequestInit): Promise<T> {
+export async function apiJson<T>(
+  pathOrUrl: string,
+  init?: RequestInit
+): Promise<T> {
   const response = await apiFetch(pathOrUrl, init);
   return (await response.json()) as T;
 }
@@ -151,7 +159,10 @@ interface SseStreamOptions {
  * Stream SSE from an API endpoint with credentials and auth headers.
  * EventSource does not send cookies/headers cross-origin; fetch does.
  */
-export function streamSse(pathOrUrl: string, options: SseStreamOptions): () => void {
+export function streamSse(
+  pathOrUrl: string,
+  options: SseStreamOptions
+): () => void {
   const { onEvent, onError, signal } = options;
   const url = toAbsoluteUrl(pathOrUrl);
   const controller = new AbortController();
@@ -168,7 +179,8 @@ export function streamSse(pathOrUrl: string, options: SseStreamOptions): () => v
       });
       if (!response.ok) {
         const detail = await parseError(response);
-        if (shouldEmitAuthEvent(response.status, detail)) emitAuthError(response.status, detail);
+        if (shouldEmitAuthEvent(response.status, detail))
+          emitAuthError(response.status, detail);
         if (mounted) onError?.(new ApiClientError(detail, response.status));
         return;
       }
@@ -216,7 +228,11 @@ export function streamSse(pathOrUrl: string, options: SseStreamOptions): () => v
 /**
  * POST to an endpoint and stream SSE response. Used for act workflow runs.
  */
-export function streamSsePost(pathOrUrl: string, body: unknown, options: SseStreamOptions): () => void {
+export function streamSsePost(
+  pathOrUrl: string,
+  body: unknown,
+  options: SseStreamOptions
+): () => void {
   const { onEvent, onError, signal } = options;
   const url = toAbsoluteUrl(pathOrUrl);
   const controller = new AbortController();
@@ -229,13 +245,17 @@ export function streamSsePost(pathOrUrl: string, body: unknown, options: SseStre
       const response = await fetch(url, {
         method: "POST",
         credentials: "include",
-        headers: buildHeaders({ headers: { "Content-Type": "application/json" } }),
+        headers: buildHeaders({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }),
         body: JSON.stringify(body),
         signal: effectiveSignal,
       });
       if (!response.ok) {
         const detail = await parseError(response);
-        if (shouldEmitAuthEvent(response.status, detail)) emitAuthError(response.status, detail);
+        if (shouldEmitAuthEvent(response.status, detail))
+          emitAuthError(response.status, detail);
         if (mounted) onError?.(new ApiClientError(detail, response.status));
         return;
       }

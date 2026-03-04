@@ -41,7 +41,8 @@ export default function CommandsHistoryPage() {
 
   const sortedExecutions = useMemo(() => {
     return [...executions].sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+      (a, b) =>
+        new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
     );
   }, [executions]);
 
@@ -65,7 +66,10 @@ export default function CommandsHistoryPage() {
         <h2 className="font-semibold mb-3">Exécutions</h2>
         <ul className="space-y-2">
           {sortedExecutions.map((exec) => (
-            <li key={exec.id} className="entity-card bg-slate-900 rounded border border-slate-700 p-3 text-sm">
+            <li
+              key={exec.id}
+              className="entity-card bg-slate-900 rounded border border-slate-700 p-3 text-sm"
+            >
               <p className="flex flex-wrap items-center gap-2">
                 <span>spec #{exec.command_spec_id}</span>
                 {exec.exit_code == null ? (
@@ -77,7 +81,8 @@ export default function CommandsHistoryPage() {
                 )}
               </p>
               <p className="text-xs text-slate-400">
-                {new Date(exec.started_at).toLocaleString()} · {exec.container_id} · par {exec.triggered_by}
+                {new Date(exec.started_at).toLocaleString()} ·{" "}
+                {exec.container_id} · par {exec.triggered_by}
               </p>
               <Link
                 href={`/commands/live?execution=${encodeURIComponent(String(exec.id))}`}
@@ -87,7 +92,9 @@ export default function CommandsHistoryPage() {
               </Link>
             </li>
           ))}
-          {sortedExecutions.length === 0 && <li className="text-xs text-slate-400">Aucune exécution.</li>}
+          {sortedExecutions.length === 0 && (
+            <li className="text-xs text-slate-400">Aucune exécution.</li>
+          )}
         </ul>
       </section>
     </main>

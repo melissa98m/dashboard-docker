@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useEffect, useState } from "react";
-import { apiJson } from "../../../lib/api-client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiJson, API_BASE_URL } from "../../../lib/api-client";
 
 interface ContainerDetail {
   id: string;
@@ -31,7 +29,8 @@ export default function ContainerLogsPage({
         );
         if (isMounted) setDetail(data);
       } catch (e) {
-        if (isMounted) setError(e instanceof Error ? e.message : "Erreur de chargement");
+        if (isMounted)
+          setError(e instanceof Error ? e.message : "Erreur de chargement");
       }
     };
     void loadDetail();
@@ -42,7 +41,7 @@ export default function ContainerLogsPage({
 
   useEffect(() => {
     const logsSource = new EventSource(
-      `${API_URL}/api/containers/${encodeURIComponent(containerId)}/logs?tail=100`
+      `${API_BASE_URL || ""}/api/containers/${encodeURIComponent(containerId)}/logs?tail=100`
     );
 
     logsSource.addEventListener("log", (event) => {
@@ -77,9 +76,19 @@ export default function ContainerLogsPage({
       <div className="page-header">
         <h1 className="page-title text-2xl font-bold">Logs · {detail.name}</h1>
         <div className="top-nav">
-          <Link href={`/containers/${encodeURIComponent(containerId)}`}>Vue generale</Link>
-          <Link href={`/containers/${encodeURIComponent(containerId)}/commands`}>Commandes</Link>
-          <Link href={`/containers/${encodeURIComponent(containerId)}/environment`}>Environnement</Link>
+          <Link href={`/containers/${encodeURIComponent(containerId)}`}>
+            Vue generale
+          </Link>
+          <Link
+            href={`/containers/${encodeURIComponent(containerId)}/commands`}
+          >
+            Commandes
+          </Link>
+          <Link
+            href={`/containers/${encodeURIComponent(containerId)}/environment`}
+          >
+            Environnement
+          </Link>
         </div>
       </div>
 

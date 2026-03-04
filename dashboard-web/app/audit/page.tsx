@@ -35,7 +35,9 @@ export default function AuditPage() {
       if (action && action.trim().length > 0) {
         params.set("action", action.trim());
       }
-      const data = await apiJson<AuditLogItem[]>(`/api/audit/logs?${params.toString()}`);
+      const data = await apiJson<AuditLogItem[]>(
+        `/api/audit/logs?${params.toString()}`
+      );
       setLogs(data);
       setError(null);
     } catch (e) {
@@ -69,10 +71,9 @@ export default function AuditPage() {
     });
     if (!confirmed) return;
     try {
-      await apiFetch(
-        `/api/audit/purge?days=${encodeURIComponent(purgeDays)}`,
-        { method: "POST" }
-      );
+      await apiFetch(`/api/audit/purge?days=${encodeURIComponent(purgeDays)}`, {
+        method: "POST",
+      });
       await loadLogs(actionFilter);
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Erreur");
@@ -101,7 +102,10 @@ export default function AuditPage() {
       </div>
 
       <section className="panel">
-        <form onSubmit={onFilterSubmit} className="flex flex-wrap gap-2 items-end">
+        <form
+          onSubmit={onFilterSubmit}
+          className="flex flex-wrap gap-2 items-end"
+        >
           <div className="flex-1 min-w-[220px]">
             <label className="block text-xs text-slate-400 mb-1">Action</label>
             <input
@@ -122,7 +126,10 @@ export default function AuditPage() {
               className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
             />
           </div>
-          <button type="submit" className="btn btn-primary px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-sm font-medium">
+          <button
+            type="submit"
+            className="btn btn-primary px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-sm font-medium"
+          >
             Filtrer
           </button>
           <button
@@ -136,7 +143,9 @@ export default function AuditPage() {
             Reinitialiser
           </button>
           <div className="w-[150px]">
-            <label className="block text-xs text-slate-400 mb-1">Purge (days)</label>
+            <label className="block text-xs text-slate-400 mb-1">
+              Purge (days)
+            </label>
             <input
               value={purgeDays}
               onChange={(e) => setPurgeDays(e.target.value)}
@@ -176,13 +185,17 @@ export default function AuditPage() {
         )}
         <ul className="space-y-2">
           {logs.map((log) => (
-            <li key={log.id} className="entity-card bg-slate-900 border border-slate-700 rounded p-3 text-sm">
+            <li
+              key={log.id}
+              className="entity-card bg-slate-900 border border-slate-700 rounded p-3 text-sm"
+            >
               <p className="font-medium">
                 {log.action} · {log.resource_type}
                 {log.resource_id ? `/${log.resource_id}` : ""}
               </p>
               <p className="text-slate-400 text-xs mt-1">
-                par {log.triggered_by} · {new Date(log.created_at).toLocaleString()}
+                par {log.triggered_by} ·{" "}
+                {new Date(log.created_at).toLocaleString()}
               </p>
               <pre className="code-panel text-xs text-slate-300 mt-2 whitespace-pre-wrap">
                 {JSON.stringify(log.details, null, 2)}
