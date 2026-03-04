@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useEffect } from "react";
 
 type ConfirmTone = "neutral" | "danger";
@@ -43,8 +50,8 @@ function normalizeOptions(options: ConfirmOptions): ConfirmRequest {
     cancelLabel: options.cancelLabel ?? "Annuler",
     tone: options.tone ?? "neutral",
     requireText: options.requireText ?? null,
-    inputLabel: options.inputLabel ?? "Saisie de verification",
-    inputPlaceholder: options.inputPlaceholder ?? "Tapez la valeur demandee",
+    inputLabel: options.inputLabel ?? "Saisie de vérification",
+    inputPlaceholder: options.inputPlaceholder ?? "Tapez la valeur demandée",
     delaySeconds: Math.max(0, options.delaySeconds ?? 0),
   };
 }
@@ -53,7 +60,9 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [remainingDelay, setRemainingDelay] = useState(0);
-  const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null);
+  const [resolver, setResolver] = useState<((value: boolean) => void) | null>(
+    null
+  );
 
   const close = useCallback(
     (value: boolean) => {
@@ -99,7 +108,12 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
     <ConfirmDialogContext.Provider value={value}>
       {children}
       {request && (
-        <div className="confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div
+          className="confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+        >
           <div className="confirm-modal panel">
             <h2 id="confirm-title" className="font-semibold mb-2">
               {request.title}
@@ -120,16 +134,26 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
               </div>
             )}
             <div className="btn-row">
-              <button type="button" className="btn btn-neutral" onClick={() => close(false)}>
+              <button
+                type="button"
+                className="btn btn-neutral"
+                onClick={() => close(false)}
+              >
                 {request.cancelLabel}
               </button>
               <button
                 type="button"
-                className={request.tone === "danger" ? "btn btn-danger" : "btn btn-primary"}
+                className={
+                  request.tone === "danger"
+                    ? "btn btn-danger"
+                    : "btn btn-primary"
+                }
                 onClick={() => close(true)}
                 disabled={!inputMatchesRequirement || !delayReady}
               >
-                {delayReady ? request.confirmLabel : `${request.confirmLabel} (${remainingDelay}s)`}
+                {delayReady
+                  ? request.confirmLabel
+                  : `${request.confirmLabel} (${remainingDelay}s)`}
               </button>
             </div>
           </div>

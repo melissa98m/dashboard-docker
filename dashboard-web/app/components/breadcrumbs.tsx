@@ -10,11 +10,12 @@ const LABELS: Record<string, string> = {
   containers: "Conteneurs",
   history: "Historique",
   live: "Temps reel",
-  rules: "Regles",
-  settings: "Parametres",
+  rules: "Règles",
+  settings: "Paramètres",
   logs: "Logs",
   environment: "Environnement",
   catalog: "Catalogue",
+  workflows: "Workflows",
 };
 
 function toLabel(segment: string): string {
@@ -42,7 +43,11 @@ export default function Breadcrumbs() {
           return (
             <li
               key={item.href}
-              className={index > 1 && index < items.length - 1 ? "crumb-hide-mobile" : undefined}
+              className={
+                index > 1 && index < items.length - 1
+                  ? "crumb-hide-mobile"
+                  : undefined
+              }
             >
               {isLast ? (
                 <span aria-current="page">{item.label}</span>
