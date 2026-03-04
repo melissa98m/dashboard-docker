@@ -3,7 +3,13 @@
 import { useAuth } from "../contexts/auth-context";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { loading, authenticated, apiUnavailable, openAuthPanel, refreshAuthState } = useAuth();
+  const {
+    loading,
+    authenticated,
+    apiUnavailable,
+    openAuthPanel,
+    refreshAuthState,
+  } = useAuth();
 
   if (loading) {
     return (
@@ -20,7 +26,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           {apiUnavailable ? (
             <>
               <p className="text-lg text-slate-200">
-                L&apos;API est indisponible. Vérifiez que le backend est démarré.
+                L&apos;API est indisponible. Vérifiez que le backend est
+                démarré.
               </p>
               <button
                 type="button"

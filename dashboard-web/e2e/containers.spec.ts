@@ -23,7 +23,9 @@ test.describe("Containers page", () => {
       await page.getByPlaceholder("admin").fill(username);
       await page.getByPlaceholder("Saisir le mot de passe").fill(password);
       await page.getByRole("button", { name: "Connexion" }).click();
-      await expect(page.getByRole("heading", { name: /Conteneurs Docker/i })).toBeVisible({
+      await expect(
+        page.getByRole("heading", { name: /Conteneurs Docker/i })
+      ).toBeVisible({
         timeout: 10_000,
       });
     }

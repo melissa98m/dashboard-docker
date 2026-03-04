@@ -276,138 +276,138 @@ export default function CommandsCatalogPage() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         {isAdmin && (
-        <div className="panel">
-          <h2 className="font-semibold mb-1">
-            Ajouter une commande allowlistée
-          </h2>
-          <p className="text-xs muted mb-3">
-            Commande manuelle sécurisée (argv).
-          </p>
-          <form onSubmit={onCreate} className="grid gap-2">
+          <div className="panel">
+            <h2 className="font-semibold mb-1">
+              Ajouter une commande allowlistée
+            </h2>
+            <p className="text-xs muted mb-3">
+              Commande manuelle sécurisée (argv).
+            </p>
+            <form onSubmit={onCreate} className="grid gap-2">
+              <label>
+                <span className="field-label">Conteneur cible</span>
+                <select
+                  value={containerId}
+                  onChange={(e) => setContainerId(e.target.value)}
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                >
+                  <option value="" disabled>
+                    Choisir un conteneur
+                  </option>
+                  {containers.map((container) => (
+                    <option key={container.id} value={container.id}>
+                      {container.name} ({container.id})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {containers.length === 0 && (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-amber-300">
+                    Aucun conteneur disponible.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void reloadContainers()}
+                    disabled={reloadingContainers}
+                    className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {reloadingContainers
+                      ? "Chargement…"
+                      : "Rafraîchir la liste"}
+                  </button>
+                </div>
+              )}
+              <label>
+                <span className="field-label">Nom du service</span>
+                <input
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  placeholder="Nom du service"
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <label>
+                <span className="field-label">Nom affiche</span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nom affiché"
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <label>
+                <span className="field-label">Commande (argv)</span>
+                <input
+                  value={argv}
+                  onChange={(e) => setArgv(e.target.value)}
+                  placeholder="argv (ex: pytest -q)"
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <label>
+                <span className="field-label">
+                  Répertoire de travail (optionnel)
+                </span>
+                <input
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                  placeholder="cwd (optional)"
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <button type="submit" className="btn btn-success">
+                Ajouter
+              </button>
+            </form>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="panel">
+            <h2 className="font-semibold mb-1">Découverte auto</h2>
+            <p className="text-xs muted mb-3">
+              Scan par conteneur puis promotion allowlist.
+            </p>
             <label>
-              <span className="field-label">Conteneur cible</span>
+              <span className="field-label">Conteneur à scanner</span>
               <select
-                value={containerId}
-                onChange={(e) => setContainerId(e.target.value)}
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                value={scanContainerId}
+                onChange={(e) => setScanContainerId(e.target.value)}
+                disabled={scanningContainerId != null}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
               >
-                <option value="" disabled>
-                  Choisir un conteneur
-                </option>
                 {containers.map((container) => (
                   <option key={container.id} value={container.id}>
-                    {container.name} ({container.id})
+                    Scanner: {container.name} ({container.id})
                   </option>
                 ))}
               </select>
             </label>
-            {containers.length === 0 && (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-amber-300">
-                  Aucun conteneur disponible.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void reloadContainers()}
-                  disabled={reloadingContainers}
-                  className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {reloadingContainers
-                  ? "Chargement…"
-                  : "Rafraîchir la liste"}
-                </button>
-              </div>
-            )}
-            <label>
-              <span className="field-label">Nom du service</span>
-              <input
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                placeholder="Nom du service"
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <label>
-              <span className="field-label">Nom affiche</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nom affiché"
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <label>
-              <span className="field-label">Commande (argv)</span>
-              <input
-                value={argv}
-                onChange={(e) => setArgv(e.target.value)}
-                placeholder="argv (ex: pytest -q)"
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <label>
-              <span className="field-label">
-                Répertoire de travail (optionnel)
-              </span>
-              <input
-                value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
-                placeholder="cwd (optional)"
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <button type="submit" className="btn btn-success">
-              Ajouter
-            </button>
-          </form>
-        </div>
-        )}
-
-        {isAdmin && (
-        <div className="panel">
-          <h2 className="font-semibold mb-1">Découverte auto</h2>
-          <p className="text-xs muted mb-3">
-            Scan par conteneur puis promotion allowlist.
-          </p>
-          <label>
-            <span className="field-label">Conteneur à scanner</span>
-            <select
-              value={scanContainerId}
-              onChange={(e) => setScanContainerId(e.target.value)}
-              disabled={scanningContainerId != null}
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+            <button
+              type="button"
+              onClick={() => void onScanCommands()}
+              disabled={!scanContainerId || scanningContainerId != null}
+              className="btn btn-primary mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {containers.map((container) => (
-                <option key={container.id} value={container.id}>
-                  Scanner: {container.name} ({container.id})
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => void onScanCommands()}
-            disabled={!scanContainerId || scanningContainerId != null}
-            className="btn btn-primary mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {scanningContainerId ? "Scan…" : "Scanner les commandes"}
-          </button>
-          <label
-            className={`field-check mt-2${scanningContainerId != null ? " is-disabled" : ""}`}
-          >
-            <input
-              type="checkbox"
-              checked={forceScan}
-              disabled={scanningContainerId != null}
-              onChange={(e) => setForceScan(e.target.checked)}
-            />
-            Scan forcé
-          </label>
-        </div>
+              {scanningContainerId ? "Scan…" : "Scanner les commandes"}
+            </button>
+            <label
+              className={`field-check mt-2${scanningContainerId != null ? " is-disabled" : ""}`}
+            >
+              <input
+                type="checkbox"
+                checked={forceScan}
+                disabled={scanningContainerId != null}
+                onChange={(e) => setForceScan(e.target.checked)}
+              />
+              Scan forcé
+            </label>
+          </div>
         )}
       </section>
 

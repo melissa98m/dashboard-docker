@@ -323,7 +323,9 @@ export function ContainerCommandsPanel({
           <h3 className="text-sm font-medium">Commandes découvertes</h3>
           {isAdmin && (
             <div className="flex items-center gap-3">
-              <label className={`field-check${isScanning ? " is-disabled" : ""}`}>
+              <label
+                className={`field-check${isScanning ? " is-disabled" : ""}`}
+              >
                 <input
                   type="checkbox"
                   checked={forceScan}

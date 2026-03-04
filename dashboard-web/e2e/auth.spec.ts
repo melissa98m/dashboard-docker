@@ -15,7 +15,9 @@ test.describe("Auth flow", () => {
     await expect(
       page.getByText("Pour accéder au dashboard, veuillez vous connecter.")
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Se connecter" }).first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Se connecter" }).first()
+    ).toBeVisible();
   });
 
   test("can open auth panel and see login form", async ({ page }) => {
@@ -35,7 +37,9 @@ test.describe("Auth flow", () => {
     await page.getByPlaceholder("Saisir le mot de passe").fill(password);
     await page.getByRole("button", { name: "Connexion" }).click();
 
-    await expect(page.getByRole("heading", { name: /Conteneurs Docker/i })).toBeVisible({
+    await expect(
+      page.getByRole("heading", { name: /Conteneurs Docker/i })
+    ).toBeVisible({
       timeout: 10_000,
     });
   });

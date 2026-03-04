@@ -179,97 +179,97 @@ export default function AlertsRulesPage() {
       </div>
 
       {isAdmin && (
-      <section className="panel">
-        <h2 className="font-semibold mb-3">Créer une règle</h2>
-        <form onSubmit={onCreate} className="space-y-3">
-          <label>
-            <span className="field-label">Conteneur cible</span>
-            <select
-              value={containerId}
-              onChange={(e) => setContainerId(e.target.value)}
-              required
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
-            >
-              <option value="" disabled>
-                Choisir un conteneur
-              </option>
-              {containers.map((container) => (
-                <option key={container.id} value={container.id}>
-                  {container.name} ({container.id})
-                </option>
-              ))}
-            </select>
-          </label>
-          {containers.length === 0 && (
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-amber-300">
-                Aucun conteneur disponible.
-              </p>
-              <button
-                type="button"
-                onClick={() => void reloadContainers()}
-                disabled={reloadingContainers}
-                className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
+        <section className="panel">
+          <h2 className="font-semibold mb-3">Créer une règle</h2>
+          <form onSubmit={onCreate} className="space-y-3">
+            <label>
+              <span className="field-label">Conteneur cible</span>
+              <select
+                value={containerId}
+                onChange={(e) => setContainerId(e.target.value)}
+                required
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
               >
-                {reloadingContainers ? "Chargement…" : "Rafraîchir la liste"}
-              </button>
-            </div>
-          )}
-          <label>
-            <span className="field-label">Métrique</span>
-            <select
-              value={metricType}
-              onChange={(e) => setMetricType(e.target.value as MetricType)}
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
-            >
-              <option value="cpu_percent">CPU %</option>
-              <option value="ram_mb">RAM MB</option>
-              <option value="ram_percent">RAM %</option>
-            </select>
-          </label>
-          <label>
-            <span className="field-label">Seuil</span>
-            <input
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              placeholder="Seuil"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
-            />
-          </label>
-          <label>
-            <span className="field-label">Cooldown (secondes)</span>
-            <input
-              value={cooldownSeconds}
-              onChange={(e) => setCooldownSeconds(e.target.value)}
-              placeholder="Cooldown (secondes)"
-              type="number"
-              min="1"
-              required
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
-            />
-          </label>
-          <label>
-            <span className="field-label">Échantillons debounce</span>
-            <input
-              value={debounceSamples}
-              onChange={(e) => setDebounceSamples(e.target.value)}
-              placeholder="Echantillons debounce"
-              type="number"
-              min="1"
-              max="20"
-              required
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
-            />
-          </label>
-          <button type="submit" className="btn btn-success">
-            Ajouter
-          </button>
-        </form>
-      </section>
+                <option value="" disabled>
+                  Choisir un conteneur
+                </option>
+                {containers.map((container) => (
+                  <option key={container.id} value={container.id}>
+                    {container.name} ({container.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {containers.length === 0 && (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-amber-300">
+                  Aucun conteneur disponible.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void reloadContainers()}
+                  disabled={reloadingContainers}
+                  className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {reloadingContainers ? "Chargement…" : "Rafraîchir la liste"}
+                </button>
+              </div>
+            )}
+            <label>
+              <span className="field-label">Métrique</span>
+              <select
+                value={metricType}
+                onChange={(e) => setMetricType(e.target.value as MetricType)}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              >
+                <option value="cpu_percent">CPU %</option>
+                <option value="ram_mb">RAM MB</option>
+                <option value="ram_percent">RAM %</option>
+              </select>
+            </label>
+            <label>
+              <span className="field-label">Seuil</span>
+              <input
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                placeholder="Seuil"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              />
+            </label>
+            <label>
+              <span className="field-label">Cooldown (secondes)</span>
+              <input
+                value={cooldownSeconds}
+                onChange={(e) => setCooldownSeconds(e.target.value)}
+                placeholder="Cooldown (secondes)"
+                type="number"
+                min="1"
+                required
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              />
+            </label>
+            <label>
+              <span className="field-label">Échantillons debounce</span>
+              <input
+                value={debounceSamples}
+                onChange={(e) => setDebounceSamples(e.target.value)}
+                placeholder="Echantillons debounce"
+                type="number"
+                min="1"
+                max="20"
+                required
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              />
+            </label>
+            <button type="submit" className="btn btn-success">
+              Ajouter
+            </button>
+          </form>
+        </section>
       )}
 
       <section className="panel">
