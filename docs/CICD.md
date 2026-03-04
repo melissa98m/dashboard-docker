@@ -81,10 +81,12 @@ Puis lancer un déploiement depuis GitHub Actions (onglet Actions → CI + Deplo
 
 ### Comportement du déploiement
 
-1. SCP du code vers le Pi (`.env` est gitignored donc jamais envoyé)
-2. Si `.env` absent sur le Pi, copie depuis `.env.example`
-3. `docker compose build --pull` (BuildKit désactivé pour compatibilité Raspberry Pi)
-4. `docker compose up -d --remove-orphans`
+1. **Build sur CI** : images Docker construites pour `linux/arm64` sur GitHub Actions, poussées vers ghcr.io (évite le build Next.js sur le Pi, source de SIGSEGV par manque de RAM)
+2. **Rsync** du code vers le Pi (`.env` est gitignored donc jamais envoyé)
+3. Si `.env` absent sur le Pi, copie depuis `.env.example`
+4. `docker compose pull` puis `docker compose up -d` (aucun build sur le Pi)
+
+**Repo privé** : si le dépôt est privé, les images ghcr.io sont privées. Ajouter le secret `GHCR_TOKEN` (PAT scope `read:packages`) et configurer le login Docker sur le Pi avant le pull.
 
 **Important** : le fichier `.env` sur le Pi n’est jamais écrasé (non versionné).
 
