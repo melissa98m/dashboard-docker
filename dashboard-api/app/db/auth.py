@@ -105,15 +105,19 @@ def ensure_bootstrap_admin() -> None:
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing is not None:
             return
-        conn.execute(
-            """
-            INSERT INTO users (
-                username, password_hash, role, failed_login_attempts,
-                locked_until, last_login_at, created_at, updated_at
-            ) VALUES (?, ?, ?, 0, NULL, NULL, ?, ?)
-            """,
-            (username, _build_password_hash(password), "admin", now, now),
-        )
+        try:
+            conn.execute(
+                """
+                INSERT INTO users (
+                    username, password_hash, role, failed_login_attempts,
+                    locked_until, last_login_at, created_at, updated_at
+                ) VALUES (?, ?, ?, 0, NULL, NULL, ?, ?)
+                """,
+                (username, _build_password_hash(password), "admin", now, now),
+            )
+        except sqlite3.IntegrityError:
+            # User was created concurrently (e.g. lifespan + test setup)
+            pass
 
 
 def create_user(*, username: str, password: str, role: str = "viewer") -> dict[str, Any]:
@@ -203,6 +207,24 @@ def update_user_role(*, user_id: int, role: str) -> dict[str, Any] | None:
     }
 
 
+def reset_user_lockout(*, username: str) -> bool:
+    """Reset lockout for a user (failed_login_attempts=0, locked_until=NULL).
+    Returns True if user exists."""
+    normalized = username.strip()
+    if not normalized:
+        return False
+    with sqlite3.connect(get_db_path()) as conn:
+        cur = conn.execute(
+            """
+            UPDATE users
+            SET failed_login_attempts = 0, locked_until = NULL, updated_at = ?
+            WHERE username = ?
+            """,
+            (_now_iso(), normalized),
+        )
+        return cur.rowcount > 0
+
+
 def update_user_password(*, user_id: int, password: str) -> dict[str, Any] | None:
     """Update one user's password with policy checks and reset lockout counters."""
     if user_id <= 0:
@@ -247,11 +269,12 @@ def update_user_password(*, user_id: int, password: str) -> dict[str, Any] | Non
 
 def authenticate_credentials(
     *, username: str, password: str
-) -> tuple[bool, str | None, int | None]:
-    """Validate credentials, applying lockout policy."""
+) -> tuple[bool, str | None, int | None, str | None]:
+    """Validate credentials, applying lockout policy.
+    Returns (ok, username, user_id, reason). reason is 'locked' when account is locked."""
     normalized = username.strip()
     if not normalized or not password:
-        return False, None, None
+        return False, None, None, None
     with sqlite3.connect(get_db_path()) as conn:
         conn.row_factory = sqlite3.Row
         user = conn.execute(
@@ -267,10 +290,10 @@ def authenticate_credentials(
         if user is None:
             # Constant-time-ish fallback to reduce user enumeration signal.
             verify_password(password, _build_password_hash("invalid-password"))
-            return False, None, None
+            return False, None, None, None
         locked_until = str(user["locked_until"] or "")
         if locked_until and locked_until > now:
-            return False, None, int(user["id"])
+            return False, None, int(user["id"]), "locked"
         password_ok = verify_password(password, str(user["password_hash"]))
         if password_ok:
             conn.execute(
@@ -284,7 +307,7 @@ def authenticate_credentials(
                 """,
                 (now, now, int(user["id"])),
             )
-            return True, str(user["username"]), int(user["id"])
+            return True, str(user["username"]), int(user["id"]), None
 
         failed_attempts = int(user["failed_login_attempts"] or 0) + 1
         lockout_deadline: str | None = None
@@ -301,7 +324,7 @@ def authenticate_credentials(
             """,
             (failed_attempts, lockout_deadline, now, int(user["id"])),
         )
-        return False, None, int(user["id"])
+        return False, None, int(user["id"]), None
 
 
 def create_session(*, user_id: int) -> tuple[str, str]:

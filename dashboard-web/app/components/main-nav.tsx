@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const MAIN_LINKS = [
-  { href: "/", label: "Dashboard" },
+  { href: "/", label: "Conteneurs" },
+  { href: "/images", label: "Images" },
+  { href: "/volumes", label: "Volumes" },
   { href: "/commands", label: "Commandes" },
-  { href: "/workflows", label: "Workflows" },
   { href: "/alerts", label: "Alertes" },
   { href: "/audit", label: "Audit" },
-  { href: "/settings", label: "Parametres" },
+  { href: "/settings", label: "Paramètres" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -26,7 +27,11 @@ export default function MainNav() {
         <Link
           key={link.href}
           href={link.href}
-          className={isActive(pathname, link.href) ? "main-nav-link is-active" : "main-nav-link"}
+          className={
+            isActive(pathname, link.href)
+              ? "main-nav-link is-active"
+              : "main-nav-link"
+          }
         >
           {link.label}
         </Link>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch, apiJson } from "../../lib/api-client";
+import { useAuth } from "../../contexts/auth-context";
 import { useNotifications } from "../../components/notifications";
 
 interface CommandSpec {
@@ -32,7 +33,9 @@ interface AllowlistResponse {
   spec_id: number;
 }
 
-async function fetchContainersWithRetry(maxRetries = 2): Promise<ContainerOption[]> {
+async function fetchContainersWithRetry(
+  maxRetries = 2
+): Promise<ContainerOption[]> {
   let lastError: Error | null = null;
   let delayMs = 300;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -49,17 +52,25 @@ async function fetchContainersWithRetry(maxRetries = 2): Promise<ContainerOption
 }
 
 export default function CommandsCatalogPage() {
+  const { isAdmin } = useAuth();
   const notify = useNotifications();
   const router = useRouter();
   const [specs, setSpecs] = useState<CommandSpec[]>([]);
-  const [discoveredCommands, setDiscoveredCommands] = useState<DiscoveredCommand[]>([]);
+  const [discoveredCommands, setDiscoveredCommands] = useState<
+    DiscoveredCommand[]
+  >([]);
   const [containers, setContainers] = useState<ContainerOption[]>([]);
   const [reloadingContainers, setReloadingContainers] = useState(false);
   const [scanContainerId, setScanContainerId] = useState("");
   const [forceScan, setForceScan] = useState(false);
-  const [discoveredContainerFilter, setDiscoveredContainerFilter] = useState("");
-  const [scanningContainerId, setScanningContainerId] = useState<string | null>(null);
-  const [promotingDiscoveredId, setPromotingDiscoveredId] = useState<number | null>(null);
+  const [discoveredContainerFilter, setDiscoveredContainerFilter] =
+    useState("");
+  const [scanningContainerId, setScanningContainerId] = useState<string | null>(
+    null
+  );
+  const [promotingDiscoveredId, setPromotingDiscoveredId] = useState<
+    number | null
+  >(null);
   const [containerId, setContainerId] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [name, setName] = useState("");
@@ -77,13 +88,16 @@ export default function CommandsCatalogPage() {
     async (isManualRefresh = false) => {
       if (isManualRefresh) setRefreshing(true);
       try {
-        const [specsPayload, discoveredPayload, containersData] = await Promise.all([
-          apiJson<CommandSpec[]>("/api/commands/specs"),
-          apiJson<DiscoveredCommand[]>(discoveredUrl),
-          fetchContainersWithRetry(),
-        ]);
+        const [specsPayload, discoveredPayload, containersData] =
+          await Promise.all([
+            apiJson<CommandSpec[]>("/api/commands/specs"),
+            apiJson<DiscoveredCommand[]>(discoveredUrl),
+            fetchContainersWithRetry(),
+          ]);
         setSpecs(Array.isArray(specsPayload) ? specsPayload : []);
-        setDiscoveredCommands(Array.isArray(discoveredPayload) ? discoveredPayload : []);
+        setDiscoveredCommands(
+          Array.isArray(discoveredPayload) ? discoveredPayload : []
+        );
         setContainers(containersData);
         setError(null);
       } catch (e) {
@@ -167,13 +181,18 @@ export default function CommandsCatalogPage() {
 
   const runSpec = async (specId: number) => {
     try {
-      const payload = await apiJson<{ execution_id: number }>("/api/commands/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec_id: specId }),
-      });
+      const payload = await apiJson<{ execution_id: number }>(
+        "/api/commands/execute",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ spec_id: specId }),
+        }
+      );
       if (typeof payload.execution_id === "number") {
-        router.push(`/commands/live?execution=${encodeURIComponent(String(payload.execution_id))}`);
+        router.push(
+          `/commands/live?execution=${encodeURIComponent(String(payload.execution_id))}`
+        );
       } else {
         router.push("/commands/live");
       }
@@ -189,7 +208,10 @@ export default function CommandsCatalogPage() {
       await apiFetch("/api/commands/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ container_id: scanContainerId, force: forceScan }),
+        body: JSON.stringify({
+          container_id: scanContainerId,
+          force: forceScan,
+        }),
       });
       await loadData();
     } catch (e) {
@@ -220,7 +242,9 @@ export default function CommandsCatalogPage() {
   return (
     <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
       <div className="page-header">
-        <h1 className="page-title text-2xl font-bold">Catalogue de commandes</h1>
+        <h1 className="page-title text-2xl font-bold">
+          Catalogue de commandes
+        </h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -239,132 +263,157 @@ export default function CommandsCatalogPage() {
 
       {error && (
         <section className="panel">
-          <p className="text-red-400">Erreur: {error}</p>
+          <p className="text-red-400">Erreur : {error}</p>
+          <button
+            type="button"
+            onClick={() => void loadData(true)}
+            className="btn btn-neutral mt-2 px-3 py-1.5 text-sm"
+          >
+            Réessayer
+          </button>
         </section>
       )}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="panel">
-          <h2 className="font-semibold mb-1">Ajouter une commande allowlistee</h2>
-          <p className="text-xs muted mb-3">Commande manuelle securisee (argv).</p>
-          <form onSubmit={onCreate} className="grid gap-2">
+        {isAdmin && (
+          <div className="panel">
+            <h2 className="font-semibold mb-1">
+              Ajouter une commande allowlistée
+            </h2>
+            <p className="text-xs muted mb-3">
+              Commande manuelle sécurisée (argv).
+            </p>
+            <form onSubmit={onCreate} className="grid gap-2">
+              <label>
+                <span className="field-label">Conteneur cible</span>
+                <select
+                  value={containerId}
+                  onChange={(e) => setContainerId(e.target.value)}
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                >
+                  <option value="" disabled>
+                    Choisir un conteneur
+                  </option>
+                  {containers.map((container) => (
+                    <option key={container.id} value={container.id}>
+                      {container.name} ({container.id})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {containers.length === 0 && (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-amber-300">
+                    Aucun conteneur disponible.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void reloadContainers()}
+                    disabled={reloadingContainers}
+                    className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {reloadingContainers
+                      ? "Chargement…"
+                      : "Rafraîchir la liste"}
+                  </button>
+                </div>
+              )}
+              <label>
+                <span className="field-label">Nom du service</span>
+                <input
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  placeholder="Nom du service"
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <label>
+                <span className="field-label">Nom affiche</span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nom affiché"
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <label>
+                <span className="field-label">Commande (argv)</span>
+                <input
+                  value={argv}
+                  onChange={(e) => setArgv(e.target.value)}
+                  placeholder="argv (ex: pytest -q)"
+                  required
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <label>
+                <span className="field-label">
+                  Répertoire de travail (optionnel)
+                </span>
+                <input
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                  placeholder="cwd (optional)"
+                  className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                />
+              </label>
+              <button type="submit" className="btn btn-success">
+                Ajouter
+              </button>
+            </form>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="panel">
+            <h2 className="font-semibold mb-1">Découverte auto</h2>
+            <p className="text-xs muted mb-3">
+              Scan par conteneur puis promotion allowlist.
+            </p>
             <label>
-              <span className="field-label">Conteneur cible</span>
+              <span className="field-label">Conteneur à scanner</span>
               <select
-                value={containerId}
-                onChange={(e) => setContainerId(e.target.value)}
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
+                value={scanContainerId}
+                onChange={(e) => setScanContainerId(e.target.value)}
+                disabled={scanningContainerId != null}
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
               >
-                <option value="" disabled>
-                  Choisir un conteneur
-                </option>
                 {containers.map((container) => (
                   <option key={container.id} value={container.id}>
-                    {container.name} ({container.id})
+                    Scanner: {container.name} ({container.id})
                   </option>
                 ))}
               </select>
             </label>
-            {containers.length === 0 && (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-amber-300">Aucun conteneur disponible.</p>
-                <button
-                  type="button"
-                  onClick={() => void reloadContainers()}
-                  disabled={reloadingContainers}
-                  className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {reloadingContainers ? "Chargement..." : "Rafraichir la liste"}
-                </button>
-              </div>
-            )}
-            <label>
-              <span className="field-label">Nom du service</span>
-              <input
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                placeholder="Nom du service"
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <label>
-              <span className="field-label">Nom affiche</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nom affiche"
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <label>
-              <span className="field-label">Commande (argv)</span>
-              <input
-                value={argv}
-                onChange={(e) => setArgv(e.target.value)}
-                placeholder="argv (ex: pytest -q)"
-                required
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <label>
-              <span className="field-label">Repertoire de travail (optionnel)</span>
-              <input
-                value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
-                placeholder="cwd (optional)"
-                className="rounded bg-slate-900 px-3 py-2 border border-slate-700 w-full"
-              />
-            </label>
-            <button type="submit" className="btn btn-success">
-              Ajouter
-            </button>
-          </form>
-        </div>
-
-        <div className="panel">
-          <h2 className="font-semibold mb-1">Decouverte auto</h2>
-          <p className="text-xs muted mb-3">Scan par conteneur puis promotion allowlist.</p>
-          <label>
-            <span className="field-label">Conteneur a scanner</span>
-            <select
-              value={scanContainerId}
-              onChange={(e) => setScanContainerId(e.target.value)}
-              disabled={scanningContainerId != null}
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+            <button
+              type="button"
+              onClick={() => void onScanCommands()}
+              disabled={!scanContainerId || scanningContainerId != null}
+              className="btn btn-primary mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {containers.map((container) => (
-                <option key={container.id} value={container.id}>
-                  Scanner: {container.name} ({container.id})
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => void onScanCommands()}
-            disabled={!scanContainerId || scanningContainerId != null}
-            className="btn btn-primary mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {scanningContainerId ? "Scan..." : "Scanner les commandes"}
-          </button>
-          <label className={`field-check mt-2${scanningContainerId != null ? " is-disabled" : ""}`}>
-            <input
-              type="checkbox"
-              checked={forceScan}
-              disabled={scanningContainerId != null}
-              onChange={(e) => setForceScan(e.target.checked)}
-            />
-            Scan force
-          </label>
-        </div>
+              {scanningContainerId ? "Scan…" : "Scanner les commandes"}
+            </button>
+            <label
+              className={`field-check mt-2${scanningContainerId != null ? " is-disabled" : ""}`}
+            >
+              <input
+                type="checkbox"
+                checked={forceScan}
+                disabled={scanningContainerId != null}
+                onChange={(e) => setForceScan(e.target.checked)}
+              />
+              Scan forcé
+            </label>
+          </div>
+        )}
       </section>
 
       <section className="panel">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h2 className="font-semibold">Commandes allowlistees</h2>
+          <h2 className="font-semibold">Commandes allowlistées</h2>
           <label>
             <span className="field-label">Recherche commande</span>
             <input
@@ -383,16 +432,21 @@ export default function CommandsCatalogPage() {
                 {spec.service_name} · {spec.container_id}
               </p>
               <p className="text-xs mt-1">{spec.argv.join(" ")}</p>
-              <button onClick={() => void runSpec(spec.id)} className="btn btn-primary mt-2 px-3 py-1">
-                Executer
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => void runSpec(spec.id)}
+                  className="btn btn-primary mt-2 px-3 py-1"
+                >
+                  Exécuter
+                </button>
+              )}
             </li>
           ))}
         </ul>
       </section>
 
       <section className="panel">
-        <h2 className="font-semibold mb-3">Commandes decouvertes</h2>
+        <h2 className="font-semibold mb-3">Commandes découvertes</h2>
         <div className="grid gap-2 mb-3">
           <label>
             <span className="field-label">Filtre conteneur</span>
@@ -418,13 +472,17 @@ export default function CommandsCatalogPage() {
                 {item.service_name} · {item.container_id} · source {item.source}
               </p>
               <p className="text-xs mt-1">{item.argv.join(" ")}</p>
-              <button
-                onClick={() => void onAllowlistAndRun(item)}
-                disabled={promotingDiscoveredId === item.id}
-                className="btn btn-success mt-2 px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {promotingDiscoveredId === item.id ? "Validation..." : "Valider et lancer"}
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => void onAllowlistAndRun(item)}
+                  disabled={promotingDiscoveredId === item.id}
+                  className="btn btn-success mt-2 px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {promotingDiscoveredId === item.id
+                    ? "Validation…"
+                    : "Valider et lancer"}
+                </button>
+              )}
             </li>
           ))}
         </ul>

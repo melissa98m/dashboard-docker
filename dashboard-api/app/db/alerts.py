@@ -186,17 +186,21 @@ def seed_default_rules_for_containers(
         for metric_type, threshold in DEFAULT_ESSENTIAL_RULES:
             if rule_exists(container_id, metric_type):
                 continue
-            create_rule(
-                container_id=container_id,
-                container_name=container_name,
-                metric_type=metric_type,
-                threshold=threshold,
-                cooldown_seconds=cooldown_seconds,
-                debounce_samples=debounce_samples,
-                ntfy_topic=None,
-                enabled=True,
-            )
-            created += 1
+            try:
+                create_rule(
+                    container_id=container_id,
+                    container_name=container_name,
+                    metric_type=metric_type,
+                    threshold=threshold,
+                    cooldown_seconds=cooldown_seconds,
+                    debounce_samples=debounce_samples,
+                    ntfy_topic=None,
+                    enabled=True,
+                )
+                created += 1
+            except sqlite3.IntegrityError:
+                # Rule was created concurrently or duplicate (container_id, metric_type)
+                pass
     return created
 
 

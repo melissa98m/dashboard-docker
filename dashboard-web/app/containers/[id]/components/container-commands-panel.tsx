@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiFetch, apiJson } from "../../../lib/api-client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiFetch, apiJson, API_BASE_URL } from "../../../lib/api-client";
+import { useAuth } from "../../../contexts/auth-context";
 
 interface CommandSpec {
   id: number;
@@ -56,12 +55,21 @@ interface DiscoverResponse {
   cache_age_seconds: number | null;
 }
 
-export function ContainerCommandsPanel({ containerId }: { containerId: string }) {
+export function ContainerCommandsPanel({
+  containerId,
+}: {
+  containerId: string;
+}) {
+  const { isAdmin } = useAuth();
   const [specs, setSpecs] = useState<CommandSpec[]>([]);
   const [discovered, setDiscovered] = useState<DiscoveredCommand[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<number | null>(null);
-  const [selectedDetail, setSelectedDetail] = useState<ExecutionDetail | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<number | null>(
+    null
+  );
+  const [selectedDetail, setSelectedDetail] = useState<ExecutionDetail | null>(
+    null
+  );
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [liveLines, setLiveLines] = useState<LiveLine[]>([]);
@@ -72,13 +80,18 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
 
   const loadData = useCallback(async () => {
     try {
-      const [specsPayload, discoveredPayload, executionsPayload] = await Promise.all([
-        apiJson<CommandSpec[]>(`/api/containers/${encodeURIComponent(containerId)}/commands/specs`),
-        apiJson<DiscoveredCommand[]>(
-          `/api/containers/${encodeURIComponent(containerId)}/commands/discovered?limit=200`
-        ),
-        apiJson<Execution[]>(`/api/containers/${encodeURIComponent(containerId)}/commands/executions?limit=200`),
-      ]);
+      const [specsPayload, discoveredPayload, executionsPayload] =
+        await Promise.all([
+          apiJson<CommandSpec[]>(
+            `/api/containers/${encodeURIComponent(containerId)}/commands/specs`
+          ),
+          apiJson<DiscoveredCommand[]>(
+            `/api/containers/${encodeURIComponent(containerId)}/commands/discovered?limit=200`
+          ),
+          apiJson<Execution[]>(
+            `/api/containers/${encodeURIComponent(containerId)}/commands/executions?limit=200`
+          ),
+        ]);
       setSpecs(Array.isArray(specsPayload) ? specsPayload : []);
       setDiscovered(Array.isArray(discoveredPayload) ? discoveredPayload : []);
       setExecutions(Array.isArray(executionsPayload) ? executionsPayload : []);
@@ -126,7 +139,7 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
     setLiveStatus("connecting");
 
     const connect = async () => {
-      let streamUrl = `${API_URL}/api/commands/executions/${selectedExecutionId}/stream`;
+      let streamUrl = `${API_BASE_URL || ""}/api/commands/executions/${selectedExecutionId}/stream`;
       try {
         const payload = await apiJson<{ token: string }>(
           `/api/commands/executions/${selectedExecutionId}/stream-token`
@@ -140,13 +153,19 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
       source.addEventListener("stdout", (event) => {
         const message = event as MessageEvent;
         const payload = JSON.parse(message.data) as { line: string };
-        setLiveLines((previous) => [...previous.slice(-299), { channel: "stdout", text: payload.line }]);
+        setLiveLines((previous) => [
+          ...previous.slice(-299),
+          { channel: "stdout", text: payload.line },
+        ]);
         setLiveStatus("streaming");
       });
       source.addEventListener("stderr", (event) => {
         const message = event as MessageEvent;
         const payload = JSON.parse(message.data) as { line: string };
-        setLiveLines((previous) => [...previous.slice(-299), { channel: "stderr", text: payload.line }]);
+        setLiveLines((previous) => [
+          ...previous.slice(-299),
+          { channel: "stderr", text: payload.line },
+        ]);
         setLiveStatus("streaming");
       });
       source.addEventListener("done", (event) => {
@@ -181,23 +200,30 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
     const query = search.trim().toLowerCase();
     if (!query) return specs;
     return specs.filter((spec) =>
-      [spec.name, spec.service_name, spec.argv.join(" ")].join(" ").toLowerCase().includes(query)
+      [spec.name, spec.service_name, spec.argv.join(" ")]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
     );
   }, [search, specs]);
 
   const sortedExecutions = useMemo(() => {
     return [...executions].sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+      (a, b) =>
+        new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
     );
   }, [executions]);
 
   const runSpec = async (specId: number) => {
     try {
-      const payload = await apiJson<{ execution_id: number }>("/api/commands/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec_id: specId, container_id: containerId }),
-      });
+      const payload = await apiJson<{ execution_id: number }>(
+        "/api/commands/execute",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ spec_id: specId, container_id: containerId }),
+        }
+      );
       setSelectedExecutionId(payload.execution_id);
       await loadData();
     } catch (e) {
@@ -207,9 +233,12 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
 
   const allowlistAndRun = async (item: DiscoveredCommand) => {
     try {
-      const payload = await apiJson<AllowlistResponse>(`/api/commands/discovered/${item.id}/allowlist`, {
-        method: "POST",
-      });
+      const payload = await apiJson<AllowlistResponse>(
+        `/api/commands/discovered/${item.id}/allowlist`,
+        {
+          method: "POST",
+        }
+      );
       await runSpec(payload.spec_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -220,11 +249,14 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
     setIsScanning(true);
     setScanStatus(null);
     try {
-      const payload = await apiJson<DiscoverResponse>("/api/commands/discover", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ container_id: containerId, force: forceScan }),
-      });
+      const payload = await apiJson<DiscoverResponse>(
+        "/api/commands/discover",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ container_id: containerId, force: forceScan }),
+        }
+      );
       if (payload.cached) {
         setScanStatus(
           `Cache actif (${payload.cache_age_seconds ?? 0}s). Active "Scan forcé" pour rescanner.`
@@ -243,7 +275,7 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
   return (
     <section className="panel bg-slate-800 rounded-lg p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">Commandes du container</h2>
+        <h2 className="font-semibold">Commandes du conteneur</h2>
         <label>
           <span className="field-label">Recherche commande</span>
           <input
@@ -254,71 +286,95 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
           />
         </label>
       </div>
-      {error && <p className="text-xs text-red-400">Erreur: {error}</p>}
+      {error && <p className="text-xs text-red-400">Erreur : {error}</p>}
 
       <div>
-        <h3 className="text-sm font-medium mb-2">Commandes allowlistees</h3>
+        <h3 className="text-sm font-medium mb-2">Commandes allowlistées</h3>
         <ul className="space-y-2">
           {filteredSpecs.map((spec) => (
-            <li key={spec.id} className="entity-card bg-slate-900 rounded border border-slate-700 p-3">
+            <li
+              key={spec.id}
+              className="entity-card bg-slate-900 rounded border border-slate-700 p-3"
+            >
               <p className="font-medium">{spec.name}</p>
               <p className="text-xs text-slate-400">{spec.service_name}</p>
               <p className="text-xs mt-1">{spec.argv.join(" ")}</p>
-              <button
-                type="button"
-                onClick={() => void runSpec(spec.id)}
-                className="btn btn-primary mt-2 px-3 py-1 bg-sky-600 hover:bg-sky-500 rounded text-xs"
-              >
-                Exécuter
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => void runSpec(spec.id)}
+                  className="btn btn-primary mt-2 px-3 py-1 bg-sky-600 hover:bg-sky-500 rounded text-xs"
+                >
+                  Exécuter
+                </button>
+              )}
             </li>
           ))}
-          {filteredSpecs.length === 0 && <li className="text-xs text-slate-400">Aucune commande allowlistee.</li>}
+          {filteredSpecs.length === 0 && (
+            <li className="text-xs text-slate-400">
+              Aucune commande allowlistée.
+            </li>
+          )}
         </ul>
       </div>
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h3 className="text-sm font-medium">Commandes découvertes</h3>
-          <div className="flex items-center gap-3">
-            <label className={`field-check${isScanning ? " is-disabled" : ""}`}>
-              <input
-                type="checkbox"
-                checked={forceScan}
+          {isAdmin && (
+            <div className="flex items-center gap-3">
+              <label
+                className={`field-check${isScanning ? " is-disabled" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={forceScan}
+                  disabled={isScanning}
+                  onChange={(event) => setForceScan(event.target.checked)}
+                />
+                Scan forcé
+              </label>
+              <button
+                type="button"
+                onClick={() => void scanCommands()}
                 disabled={isScanning}
-                onChange={(event) => setForceScan(event.target.checked)}
-              />
-              Scan forcé
-            </label>
-            <button
-              type="button"
-              onClick={() => void scanCommands()}
-              disabled={isScanning}
-              className="btn btn-primary px-3 py-1 bg-sky-600 hover:bg-sky-500 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isScanning ? "Scan..." : "Scanner"}
-            </button>
-          </div>
+                className="btn btn-primary px-3 py-1 bg-sky-600 hover:bg-sky-500 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isScanning ? "Scan…" : "Scanner"}
+              </button>
+            </div>
+          )}
         </div>
-        {scanStatus && <p className="text-xs text-slate-300 mb-2">{scanStatus}</p>}
+        {scanStatus && (
+          <p className="text-xs text-slate-300 mb-2">{scanStatus}</p>
+        )}
         <ul className="space-y-2">
           {discovered.map((item) => (
-            <li key={item.id} className="entity-card bg-slate-900 rounded border border-slate-700 p-3">
+            <li
+              key={item.id}
+              className="entity-card bg-slate-900 rounded border border-slate-700 p-3"
+            >
               <p className="font-medium">{item.name}</p>
               <p className="text-xs text-slate-400">
                 {item.service_name} · source {item.source}
               </p>
               <p className="text-xs mt-1">{item.argv.join(" ")}</p>
-              <button
-                type="button"
-                onClick={() => void allowlistAndRun(item)}
-                className="btn btn-success mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs"
-              >
-                Valider et lancer
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => void allowlistAndRun(item)}
+                  className="btn btn-success mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs"
+                >
+                  Valider et lancer
+                </button>
+              )}
             </li>
           ))}
-          {discovered.length === 0 && <li className="text-xs text-slate-400">Aucune commande découverte.</li>}
+          {discovered.length === 0 && (
+            <li className="text-xs text-slate-400">
+              Aucune commande découverte.
+            </li>
+          )}
         </ul>
       </div>
 
@@ -331,10 +387,12 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
               className="entity-card bg-slate-900 rounded border border-slate-700 p-3 text-xs"
             >
               <p className="text-slate-200">
-                #{execution.id} · spec #{execution.command_spec_id} · {execution.status}
+                #{execution.id} · spec #{execution.command_spec_id} ·{" "}
+                {execution.status}
               </p>
               <p className="text-slate-400">
-                {new Date(execution.started_at).toLocaleString()} · par {execution.triggered_by}
+                {new Date(execution.started_at).toLocaleString()} · par{" "}
+                {execution.triggered_by}
               </p>
               <button
                 type="button"
@@ -345,18 +403,24 @@ export function ContainerCommandsPanel({ containerId }: { containerId: string })
               </button>
             </li>
           ))}
-          {sortedExecutions.length === 0 && <li className="text-xs text-slate-400">Aucune exécution.</li>}
+          {sortedExecutions.length === 0 && (
+            <li className="text-xs text-slate-400">Aucune exécution.</li>
+          )}
         </ul>
 
         <p className="text-xs text-slate-400 mb-2">
-          Exécution active: {selectedExecutionId ?? "aucune"} · état stream: {liveStatus}
+          Exécution active : {selectedExecutionId ?? "aucune"} · état stream :{" "}
+          {liveStatus}
         </p>
         <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-48 overflow-auto mb-2">
-          {liveLines.map((line) => `[${line.channel}] ${line.text}`).join("\n") || "Aucun flux live"}
+          {liveLines
+            .map((line) => `[${line.channel}] ${line.text}`)
+            .join("\n") || "Aucun flux live"}
         </pre>
         <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-48 overflow-auto">
           {selectedDetail
-            ? `${selectedDetail.stdout_tail}\n${selectedDetail.stderr_tail}`.trim() || "Logs vides"
+            ? `${selectedDetail.stdout_tail}\n${selectedDetail.stderr_tail}`.trim() ||
+              "Logs vides"
             : "Sélectionne une exécution pour afficher le snapshot stdout/stderr"}
         </pre>
       </div>

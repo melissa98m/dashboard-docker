@@ -36,7 +36,10 @@ export default function AuthAccessPanel() {
 
     window.addEventListener(getAuthEventName(), onAuthError as EventListener);
     return () => {
-      window.removeEventListener(getAuthEventName(), onAuthError as EventListener);
+      window.removeEventListener(
+        getAuthEventName(),
+        onAuthError as EventListener
+      );
     };
   }, []);
 
@@ -51,7 +54,9 @@ export default function AuthAccessPanel() {
         body: JSON.stringify({ username: username.trim(), password }),
       });
       setPassword("");
-      window.location.reload();
+      setAuthError(null);
+      await refreshAuthState();
+      setIsOpen(false);
     } catch (error) {
       if (error instanceof ApiClientError) {
         setAuthError({ status: error.status, message: error.message });
@@ -76,7 +81,11 @@ export default function AuthAccessPanel() {
     }
   };
 
-  const buttonLabel = loading ? "Auth" : me ? `Connecte: ${me.username}` : "Se connecter";
+  const buttonLabel = loading
+    ? "Auth"
+    : me
+      ? `Connecté : ${me.username}`
+      : "Se connecter";
 
   return (
     <div className="auth-panel">
@@ -90,54 +99,62 @@ export default function AuthAccessPanel() {
         <span>{buttonLabel}</span>
       </button>
       {isOpen && (
-        <form onSubmit={onSubmit} className="auth-panel-popover panel">
+        <div className="auth-panel-popover panel">
           <p className="text-sm font-semibold mb-2">Session utilisateur</p>
           {authError && (
             <p className="text-xs text-red-400 mb-2">
-              Erreur {authError.status}: {authError.message}
+              Erreur {authError.status} : {authError.message}
             </p>
           )}
           {me ? (
-            <div className="mb-2 text-xs text-slate-300">
-              <p>Utilisateur: {me.username}</p>
-              <p>Role: {me.role}</p>
-            </div>
-          ) : null}
-          <label>
-            <span className="field-label">Nom d&apos;utilisateur</span>
-            <input
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="admin"
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
-              autoComplete="username"
-            />
-          </label>
-          <label>
-            <span className="field-label">Mot de passe</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Saisir le mot de passe"
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
-              autoComplete="current-password"
-            />
-          </label>
-          <div className="btn-row">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting || !username.trim() || !password}
-            >
-              {submitting ? "Connexion..." : "Connexion"}
-            </button>
-            <button type="button" className="btn btn-neutral" onClick={onLogout} disabled={submitting || !me}>
-              Deconnexion
-            </button>
-          </div>
-        </form>
+            <>
+              <div className="mb-3 text-xs text-slate-300">
+                <p>Utilisateur : {me.username}</p>
+                <p>Rôle : {me.role}</p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-neutral w-full"
+                onClick={onLogout}
+                disabled={submitting}
+              >
+                {submitting ? "Déconnexion…" : "Déconnexion"}
+              </button>
+            </>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-2">
+              <label>
+                <span className="field-label">Nom d&apos;utilisateur</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="admin"
+                  className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                <span className="field-label">Mot de passe</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Saisir le mot de passe"
+                  className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
+                  autoComplete="current-password"
+                />
+              </label>
+              <button
+                type="submit"
+                className="btn btn-primary w-full"
+                disabled={submitting || !username.trim() || !password}
+              >
+                {submitting ? "Connexion…" : "Connexion"}
+              </button>
+            </form>
+          )}
+        </div>
       )}
     </div>
   );

@@ -7,12 +7,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Use temp DB for tests (before app imports config)
-os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/dashboard_test.db")
-os.environ.setdefault("AUTH_ENABLED", "true")
-os.environ.setdefault("ALERT_ENGINE_ENABLED", "false")
-os.environ.setdefault("EVENT_WATCHER_ENABLED", "false")
-os.environ.setdefault("AUDIT_RETENTION_AUTO_ENABLED", "false")
-os.environ.setdefault("COMMAND_EXECUTION_RETENTION_AUTO_ENABLED", "false")
+# Force override (docker-compose env_file can set these; tests need predictable values)
+os.environ["DATABASE_URL"] = "sqlite:////tmp/dashboard_test.db"
+os.environ["AUTH_ENABLED"] = "true"
+os.environ["ALERT_ENGINE_ENABLED"] = "false"
+os.environ["EVENT_WATCHER_ENABLED"] = "false"
+os.environ["AUDIT_RETENTION_AUTO_ENABLED"] = "false"
+os.environ["COMMAND_EXECUTION_RETENTION_AUTO_ENABLED"] = "false"
 
 from app.main import app
 

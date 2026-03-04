@@ -7,7 +7,8 @@ import sys
 def _print_usage() -> None:
     print(
         "Usage: python -m app.cli migrate | purge-audit [days] | "
-        "create-user --username <value> [--role admin|viewer]"
+        "create-user --username <value> [--role admin|viewer] | "
+        "unlock-user --username <value>"
     )
 
 
@@ -108,6 +109,20 @@ def main() -> None:
         exit_code = _handle_create_user(sys.argv[2:])
         if exit_code != 0:
             sys.exit(exit_code)
+    elif cmd == "unlock-user":
+        if "--username" not in sys.argv or sys.argv.index("--username") + 1 >= len(sys.argv):
+            print("Missing --username <value>")
+            _print_usage()
+            sys.exit(1)
+        idx = sys.argv.index("--username") + 1
+        username = sys.argv[idx]
+        from app.db.auth import reset_user_lockout
+
+        if reset_user_lockout(username=username):
+            print(f"Lockout reset for user: {username}")
+        else:
+            print(f"User not found: {username}")
+            sys.exit(1)
     else:
         print(f"Unknown command: {cmd}")
         _print_usage()

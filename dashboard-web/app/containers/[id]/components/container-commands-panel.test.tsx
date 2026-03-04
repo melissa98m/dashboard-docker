@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContainerCommandsPanel } from "./container-commands-panel";
 
+vi.mock("../../../contexts/auth-context", () => ({
+  useAuth: () => ({ isAdmin: true }),
+}));
+
 class MockEventSource {
   static instances: MockEventSource[] = [];
   closed = false;
@@ -44,13 +48,22 @@ describe("ContainerCommandsPanel", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     MockEventSource.instances = [];
-    vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
+    vi.stubGlobal(
+      "EventSource",
+      MockEventSource as unknown as typeof EventSource
+    );
 
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/api/containers/abc123/commands/specs")) {
         return buildJsonResponse([
-          { id: 1, container_id: "abc123", service_name: "api", name: "Run tests", argv: ["pytest", "-q"] },
+          {
+            id: 1,
+            container_id: "abc123",
+            service_name: "api",
+            name: "Run tests",
+            argv: ["pytest", "-q"],
+          },
         ]);
       }
       if (url.includes("/api/containers/abc123/commands/discovered")) {
@@ -140,8 +153,8 @@ describe("ContainerCommandsPanel", () => {
     expect(container.textContent).toContain("Run tests");
     expect(container.textContent).toContain("npm test");
 
-    const runButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Exécuter")
+    const runButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Exécuter")
     );
     expect(runButton).toBeTruthy();
 
@@ -164,8 +177,8 @@ describe("ContainerCommandsPanel", () => {
     await flush();
     await flush();
 
-    const scanButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Scanner")
+    const scanButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Scanner")
     );
     expect(scanButton).toBeTruthy();
 

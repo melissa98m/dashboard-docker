@@ -1,0 +1,26 @@
+# Dependencies and build artifacts (reduces context size, speeds CI)
+dashboard-web/node_modules
+dashboard-web/.next
+dashboard-api/__pycache__
+dashboard-api/.venv
+*.pyc
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+*.md
+!README.md
+
+# Local dev
+.env
+.env.*
+!.env.example
+*.db
+backups/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Docs (not needed in images)
+docs/

@@ -1,52 +1,74 @@
-name: CI
+name: CI + Deploy (Raspberry Pi)
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create minimal .env
-        run: |
-          cp .env.example .env 2>/dev/null || touch .env
-          echo "DATABASE_URL=sqlite:////tmp/dashboard.db" >> .env
-          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
-
-      - name: Lint API + Web
-        run: make lint-ci
-
   test:
-    name: Test
+    name: Lint, format & tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Create minimal .env
         run: |
           cp .env.example .env 2>/dev/null || touch .env
           echo "DATABASE_URL=sqlite:////tmp/dashboard.db" >> .env
-          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
-
-      - name: Run tests
-        run: make test-ci
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create minimal .env
-        run: |
-          cp .env.example .env 2>/dev/null || touch .env
           echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
 
       - name: Build Docker images
         run: make build
+
+      - name: Lint API + Web
+        run: make lint-ci
+
+      - name: Format check
+        run: make format-check
+
+      - name: Run tests
+        run: make test-ci
+
+  deploy:
+    needs: test
+    # Skip when SSH secrets are not configured (avoids "invalid credentials" on PR/fork)
+    if: >
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch')
+      && secrets.SSH_HOST != ''
+      && secrets.SSH_PRIVATE_KEY != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload project to Raspberry Pi
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source: "."
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            [ -f .env ] || cp .env.example .env
+            export COMPOSE_BAKE=false
+            export DOCKER_BUILDKIT=0
+            docker compose build --pull
+            docker compose up -d --remove-orphans

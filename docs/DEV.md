@@ -16,7 +16,8 @@
 ## Standard commands (must exist)
 - Lint: `make lint` (nécessite `make up` pour exec) ; `make lint-ci` (CI, sans stack démarrée)
 - Tests: `make test` ; CI: `make test-ci` (fail-fast, sortie concise)
-- Format: `make format`
+- E2E: `make test-e2e` — nécessite `make up` et Node.js sur l’hôte. Premier lancement : `cd dashboard-web && npm install && npx playwright install chromium`. Creds optionnels (`E2E_USERNAME`, `E2E_PASSWORD`) pour les tests authentifiés.
+- Format: `make format` ; vérif: `make format-check` (CI)
 - Build: `make build`
 - Purge audit logs: `make purge-audit`
 - Restart: `make restart`
@@ -33,6 +34,8 @@
 - Alert auto-evaluation runs in background (`ALERT_ENGINE_ENABLED=true`) every `ALERT_POLL_SECONDS`.
 - Event watcher (`EVENT_WATCHER_ENABLED=true`) listens to Docker container die/oom events; on detection, fetches last logs, writes audit, sends ntfy notification with restart link. Optional topic override: `EVENT_WATCHER_NTFY_TOPIC`. Status visible in `GET /api/system/security-status` (`event_watcher_enabled`, `event_watcher_running`).
 - ntfy notifications are optional and only active when `NTFY_BASE_URL` + `NTFY_TOPIC` are set.
+- Resend email alerts are optional and active when `RESEND_API_KEY` + `ALERT_EMAIL_FROM` + `ALERT_EMAIL_TO` are set. Domaine vérifié requis sur resend.com.
+- Default alert rules (CPU 90%, RAM 90%) are auto-seeded at API startup for each running container.
 - To enable signed restart action links, set `API_SECRET_KEY` + `PUBLIC_API_URL` (and tune `RESTART_ACTION_TTL_SECONDS`).
 - Restart token endpoint is rate-limited with `RESTART_TOKEN_RATE_LIMIT_WINDOW_SECONDS` / `RESTART_TOKEN_RATE_LIMIT_MAX_ATTEMPTS`.
 - Command execution SSE stream supports short-lived one-time query tokens via `EXECUTION_STREAM_TOKEN_TTL_SECONDS`.

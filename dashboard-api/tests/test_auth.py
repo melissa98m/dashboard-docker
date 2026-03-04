@@ -267,7 +267,7 @@ def test_auth_lockout_after_failed_attempts(client):
         )
         assert first.status_code == 401
         assert second.status_code == 401
-        assert third.status_code == 401
+        assert third.status_code == 429  # locked
     finally:
         settings.auth_enabled = previous_auth_enabled
         settings.auth_cookie_secure = previous_secure_cookie
