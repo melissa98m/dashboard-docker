@@ -6,7 +6,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -sSfL https://raw.githubusercontent.com/nektos/act/master/install.sh | sh
+    && ARCH=$(uname -m) \
+    && ACT_ARCH=$(case "$ARCH" in x86_64) echo "x86_64" ;; aarch64|arm64) echo "arm64" ;; *) echo "x86_64" ;; esac) \
+    && curl -sSfL "https://github.com/nektos/act/releases/latest/download/act_Linux_${ACT_ARCH}.tar.gz" | tar xz -C /usr/local/bin act \
+    && chmod +x /usr/local/bin/act \
+    && act --version
 
 COPY dashboard-api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
