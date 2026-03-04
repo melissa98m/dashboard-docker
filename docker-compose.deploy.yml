@@ -1,0 +1,7 @@
+# Override for deploy: use pre-built images from ghcr.io (built on CI, no build on Pi)
+# Used when COMPOSE_IMAGE_API and COMPOSE_IMAGE_WEB are set
+services:
+  dashboard-api:
+    image: ${COMPOSE_IMAGE_API}
+  dashboard-web:
+    image: ${COMPOSE_IMAGE_WEB}
