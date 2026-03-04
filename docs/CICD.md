@@ -53,7 +53,7 @@ Workflow qui crée ou met à jour une PR (corps = messages de commit) à chaque 
 |------------------|--------------------------------------------------|
 | `SSH_HOST`       | IP ou hostname du Pi (ex. `192.168.1.10` ou `pi.local`) |
 | `SSH_USER`       | Utilisateur SSH (ex. `pi`)                       |
-| `SSH_PORT`       | *(optionnel)* Port SSH (défaut 22)              |
+| `SSH_PORT`       | *(optionnel)* Port SSH (défaut 22, ex. 2023 si personnalisé) |
 | `SSH_PRIVATE_KEY`| Clé privée SSH pour se connecter au Pi          |
 | `SSH_PASSPHRASE` | *(optionnel)* Passphrase de la clé si protégée  |
 | `DEPLOY_PATH`    | Chemin du projet sur le Pi (ex. `/home/pi/docker-dashboard`) |
