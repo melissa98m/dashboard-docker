@@ -45,12 +45,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate deploy secrets
+      - name: Validate and sanitize deploy secrets
         run: |
-          if [ -z "$SSH_HOST" ]; then echo "::error::Secret SSH_HOST is empty. Add it in Settings → Secrets → Actions"; exit 1; fi
+          SSH_HOST=$(printf '%s' "$SSH_HOST" | tr -d '\n\r' | xargs)
+          SSH_USER=$(printf '%s' "$SSH_USER" | tr -d '\n\r' | xargs)
+          SSH_PORT=$(printf '%s' "$SSH_PORT" | tr -d '\n\r' | xargs)
+          DEPLOY_PATH=$(printf '%s' "$DEPLOY_PATH" | tr -d '\n\r' | xargs)
+          [ -z "$SSH_PORT" ] && SSH_PORT=22
+          if [ -z "$SSH_HOST" ]; then echo "::error::Secret SSH_HOST is empty or invalid"; exit 1; fi
           if [ -z "$SSH_USER" ]; then echo "::error::Secret SSH_USER is empty"; exit 1; fi
           if [ -z "$DEPLOY_PATH" ]; then echo "::error::Secret DEPLOY_PATH is empty"; exit 1; fi
-          echo "Secrets OK (host configured)"
+          echo "SSH_HOST=$SSH_HOST" >> $GITHUB_ENV
+          echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
+          echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
+          echo "DEPLOY_PATH=$DEPLOY_PATH" >> $GITHUB_ENV
+          echo "Secrets OK"
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
