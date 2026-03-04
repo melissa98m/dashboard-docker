@@ -32,11 +32,11 @@ format:
 
 format-check:
 	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api ruff format --check .
-	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run format:check
+	docker compose run --no-deps --rm dashboard-web npm run format:check
 
 lint-ci:
 	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api ruff check . && docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api mypy .
-	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run lint
+	docker compose run --no-deps --rm dashboard-web npm run lint
 
 test: test-api test-web
 
@@ -52,7 +52,7 @@ test-api-ci:
 	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-api:/app" dashboard-api pytest -v -x --tb=short -q
 
 test-web-ci:
-	docker compose run --no-deps --rm -v "$$(pwd)/dashboard-web:/app" -w /app dashboard-web npm run test
+	docker compose run --no-deps --rm dashboard-web npm run test
 
 test-e2e:
 	@echo "Prerequisite: make up. First run: cd dashboard-web && npm install && npx playwright install chromium"
