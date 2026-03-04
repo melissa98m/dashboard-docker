@@ -329,6 +329,8 @@ export default function DashboardPage() {
             {refreshing ? "Rafraîchissement…" : "Rafraîchir"}
           </button>
           <div className="top-nav">
+            <Link href="/images">Images</Link>
+            <Link href="/volumes">Volumes</Link>
             <Link href="/commands">Commandes</Link>
             <Link href="/alerts">Alertes</Link>
             <Link href="/audit">Audit</Link>
@@ -450,7 +452,10 @@ export default function DashboardPage() {
                       onChange={() => toggleSelection(c.id)}
                       aria-label={`Sélectionner ${c.name}`}
                     />
-                    <span className="container-checkbox__indicator" aria-hidden />
+                    <span
+                      className="container-checkbox__indicator"
+                      aria-hidden
+                    />
                   </label>
                 )}
                 <div className="container-card__info">
@@ -532,7 +537,9 @@ export default function DashboardPage() {
                     disabled={deletingContainerId === c.id}
                     className="container-btn container-btn--delete"
                   >
-                    {deletingContainerId === c.id ? "Suppression…" : "Supprimer"}
+                    {deletingContainerId === c.id
+                      ? "Suppression…"
+                      : "Supprimer"}
                   </button>
                 </div>
               ) : (

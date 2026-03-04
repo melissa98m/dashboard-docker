@@ -18,7 +18,9 @@ from app.routers import (
     container_env,
     containers,
     health,
+    images,
     system,
+    volumes,
     workflows,
 )
 from app.security import get_current_auth_context
@@ -116,6 +118,8 @@ async def enforce_authenticated_api(request: Request, call_next):
 app.include_router(health.router, tags=["health"])
 app.include_router(containers.router, prefix="/api/containers", tags=["containers"])
 app.include_router(container_env.router, prefix="/api/containers", tags=["container-env"])
+app.include_router(images.router, prefix="/api/images", tags=["images"])
+app.include_router(volumes.router, prefix="/api/volumes", tags=["volumes"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])

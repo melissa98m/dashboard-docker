@@ -9,12 +9,14 @@ const LABELS: Record<string, string> = {
   commands: "Commandes",
   containers: "Conteneurs",
   history: "Historique",
+  images: "Images",
   live: "Temps reel",
   rules: "Règles",
   settings: "Paramètres",
   logs: "Logs",
   environment: "Environnement",
   catalog: "Catalogue",
+  volumes: "Volumes",
   workflows: "Workflows",
 };
 
