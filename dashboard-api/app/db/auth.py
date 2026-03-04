@@ -208,7 +208,8 @@ def update_user_role(*, user_id: int, role: str) -> dict[str, Any] | None:
 
 
 def reset_user_lockout(*, username: str) -> bool:
-    """Reset lockout for a user (failed_login_attempts=0, locked_until=NULL). Returns True if user exists."""
+    """Reset lockout for a user (failed_login_attempts=0, locked_until=NULL).
+    Returns True if user exists."""
     normalized = username.strip()
     if not normalized:
         return False
