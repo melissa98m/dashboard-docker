@@ -136,7 +136,7 @@ def login(payload: LoginRequest, response: Response):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication is disabled",
         )
-    ok, username, user_id = authenticate_credentials(
+    ok, username, user_id, reason = authenticate_credentials(
         username=payload.username,
         password=payload.password,
     )
@@ -146,8 +146,14 @@ def login(payload: LoginRequest, response: Response):
             resource_type="user",
             resource_id=payload.username.strip() or None,
             triggered_by="anonymous",
-            details={"reason": "invalid_credentials"},
+            details={"reason": reason or "invalid_credentials"},
         )
+        if reason == "locked":
+            mins = settings.auth_lockout_minutes
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Compte temporairement verrouillé (trop de tentatives). Réessayez dans {mins} minutes.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",

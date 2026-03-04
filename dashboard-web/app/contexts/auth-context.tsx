@@ -23,7 +23,7 @@ interface AuthContextValue {
   me: AuthMeResponse | null;
   isAdmin: boolean;
   apiUnavailable: boolean;
-  refreshAuthState: () => Promise<void>;
+  refreshAuthState: () => Promise<boolean>;
   openAuthPanel: () => void;
   registerOpenAuthPanel: (fn: () => void) => void;
 }
@@ -36,11 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [apiUnavailable, setApiUnavailable] = useState(false);
   const openAuthPanelRef = useRef<(() => void) | null>(null);
 
-  const refreshAuthState = useCallback(async (): Promise<void> => {
+  const refreshAuthState = useCallback(async (): Promise<boolean> => {
     setApiUnavailable(false);
     try {
       const response = await apiJson<AuthMeResponse>("/api/auth/me");
       setMe(response);
+      return response?.authenticated ?? false;
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 401) {
         setMe(null);
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMe(null);
         setApiUnavailable(true);
       }
+      return false;
     } finally {
       setLoading(false);
     }
@@ -68,9 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshAuthState();
 
-    const onAuthError = () => {
-      setMe(null);
-      openAuthPanelRef.current?.();
+    const onAuthError = async () => {
+      const stillAuthenticated = await refreshAuthState();
+      if (!stillAuthenticated) {
+        openAuthPanelRef.current?.();
+      }
     };
 
     window.addEventListener(getAuthEventName(), onAuthError as EventListener);

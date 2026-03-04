@@ -1,4 +1,4 @@
-.PHONY: build up down restart ps dev logs lint lint-ci format format-check test test-api test-web test-ci test-e2e shell-api shell-web migrate purge-audit create-user db-backup clean health-check
+.PHONY: build up down restart ps dev logs lint lint-ci format format-check test test-api test-web test-ci test-e2e shell-api shell-web migrate purge-audit create-user unlock-user db-backup clean health-check
 
 ROLE ?= viewer
 
@@ -72,6 +72,9 @@ purge-audit:
 
 create-user:
 	docker compose exec dashboard-api python -m app.cli create-user --username "$(USERNAME)" --role "$(ROLE)"
+
+unlock-user:
+	docker compose exec dashboard-api python -m app.cli unlock-user --username "$(USERNAME)"
 
 db-backup:
 	@mkdir -p backups
