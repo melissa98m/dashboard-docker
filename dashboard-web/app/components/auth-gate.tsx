@@ -3,7 +3,7 @@
 import { useAuth } from "../contexts/auth-context";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { loading, authenticated, openAuthPanel } = useAuth();
+  const { loading, authenticated, apiUnavailable, openAuthPanel, refreshAuthState } = useAuth();
 
   if (loading) {
     return (
@@ -17,16 +17,33 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <main className="page-shell p-4 max-w-4xl mx-auto">
         <div className="panel bg-slate-800/80 rounded-lg p-8 text-center space-y-4">
-          <p className="text-lg text-slate-200">
-            Pour accéder au dashboard, veuillez vous connecter.
-          </p>
-          <button
-            type="button"
-            onClick={openAuthPanel}
-            className="btn btn-primary px-6 py-2.5 text-base"
-          >
-            Se connecter
-          </button>
+          {apiUnavailable ? (
+            <>
+              <p className="text-lg text-slate-200">
+                L&apos;API est indisponible. Vérifiez que le backend est démarré.
+              </p>
+              <button
+                type="button"
+                onClick={() => void refreshAuthState()}
+                className="btn btn-primary px-6 py-2.5 text-base"
+              >
+                Réessayer
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-lg text-slate-200">
+                Pour accéder au dashboard, veuillez vous connecter.
+              </p>
+              <button
+                type="button"
+                onClick={openAuthPanel}
+                className="btn btn-primary px-6 py-2.5 text-base"
+              >
+                Se connecter
+              </button>
+            </>
+          )}
         </div>
       </main>
     );

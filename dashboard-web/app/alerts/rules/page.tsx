@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch, apiJson } from "../../lib/api-client";
+import { useAuth } from "../../contexts/auth-context";
 import { useNotifications } from "../../components/notifications";
 
 type MetricType = "cpu_percent" | "ram_mb" | "ram_percent";
@@ -28,14 +29,17 @@ const metricLabels: Record<MetricType, string> = {
   ram_percent: "RAM %",
 };
 
-async function fetchContainersWithRetry(maxRetries = 2): Promise<ContainerOption[]> {
+async function fetchContainersWithRetry(
+  maxRetries = 2
+): Promise<ContainerOption[]> {
   let lastError: Error | null = null;
   let delayMs = 300;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
       return await apiJson<ContainerOption[]>("/api/containers");
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Erreur de chargement");
+      lastError =
+        error instanceof Error ? error : new Error("Erreur de chargement");
       if (attempt === maxRetries) break;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       delayMs *= 2;
@@ -45,6 +49,7 @@ async function fetchContainersWithRetry(maxRetries = 2): Promise<ContainerOption
 }
 
 export default function AlertsRulesPage() {
+  const { isAdmin } = useAuth();
   const notify = useNotifications();
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [containers, setContainers] = useState<ContainerOption[]>([]);
@@ -97,7 +102,9 @@ export default function AlertsRulesPage() {
   const onCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      const selectedContainer = containers.find((container) => container.id === containerId);
+      const selectedContainer = containers.find(
+        (container) => container.id === containerId
+      );
       await apiFetch("/api/alerts/rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,7 +157,7 @@ export default function AlertsRulesPage() {
   return (
     <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
       <div className="page-header">
-        <h1 className="page-title text-2xl font-bold">Regles d&apos;alertes</h1>
+        <h1 className="page-title text-2xl font-bold">Règles d&apos;alertes</h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -158,7 +165,11 @@ export default function AlertsRulesPage() {
             disabled={loading || refreshing}
             className="btn btn-neutral px-3 py-1.5 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {refreshing ? "Rafraîchissement…" : loading ? "Chargement…" : "Rafraîchir"}
+            {refreshing
+              ? "Rafraîchissement…"
+              : loading
+                ? "Chargement…"
+                : "Rafraîchir"}
           </button>
           <div className="top-nav">
             <Link href="/alerts/history">Historique</Link>
@@ -167,8 +178,9 @@ export default function AlertsRulesPage() {
         </div>
       </div>
 
+      {isAdmin && (
       <section className="panel">
-        <h2 className="font-semibold mb-3">Creer une regle</h2>
+        <h2 className="font-semibold mb-3">Créer une règle</h2>
         <form onSubmit={onCreate} className="space-y-3">
           <label>
             <span className="field-label">Conteneur cible</span>
@@ -190,19 +202,21 @@ export default function AlertsRulesPage() {
           </label>
           {containers.length === 0 && (
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-amber-300">Aucun conteneur disponible.</p>
+              <p className="text-xs text-amber-300">
+                Aucun conteneur disponible.
+              </p>
               <button
                 type="button"
                 onClick={() => void reloadContainers()}
                 disabled={reloadingContainers}
                 className="btn btn-neutral px-3 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {reloadingContainers ? "Chargement..." : "Rafraichir la liste"}
+                {reloadingContainers ? "Chargement…" : "Rafraîchir la liste"}
               </button>
             </div>
           )}
           <label>
-            <span className="field-label">Metrique</span>
+            <span className="field-label">Métrique</span>
             <select
               value={metricType}
               onChange={(e) => setMetricType(e.target.value as MetricType)}
@@ -239,7 +253,7 @@ export default function AlertsRulesPage() {
             />
           </label>
           <label>
-            <span className="field-label">Echantillons debounce</span>
+            <span className="field-label">Échantillons debounce</span>
             <input
               value={debounceSamples}
               onChange={(e) => setDebounceSamples(e.target.value)}
@@ -256,32 +270,59 @@ export default function AlertsRulesPage() {
           </button>
         </form>
       </section>
+      )}
 
       <section className="panel">
-        <h2 className="font-semibold mb-3">Regles actives</h2>
-        {loading && <p>Chargement...</p>}
-        {error && <p className="text-red-400">Erreur: {error}</p>}
-        {!loading && !error && rules.length === 0 && <p className="text-slate-400">Aucune regle.</p>}
+        <h2 className="font-semibold mb-3">Règles actives</h2>
+        {loading && <p>Chargement…</p>}
+        {error && (
+          <div className="space-y-2">
+            <p className="text-red-400">Erreur : {error}</p>
+            <button
+              type="button"
+              onClick={() => void loadData(false)}
+              className="btn btn-neutral px-3 py-1.5 text-sm"
+            >
+              Réessayer
+            </button>
+          </div>
+        )}
+        {!loading && !error && rules.length === 0 && (
+          <p className="text-slate-400">Aucune règle.</p>
+        )}
         <ul className="space-y-2">
           {rules.map((rule) => (
-            <li key={rule.id} className="entity-card flex items-center justify-between gap-2">
+            <li
+              key={rule.id}
+              className="entity-card flex items-center justify-between gap-2"
+            >
               <div>
                 <p className="font-medium">{rule.container_name}</p>
                 <p className="text-xs text-slate-400">
-                  {rule.container_id} · {metricLabels[rule.metric_type]} ≥ {rule.threshold} · cooldown{" "}
-                  {rule.cooldown_seconds}s · debounce {rule.debounce_samples}
+                  {rule.container_id} · {metricLabels[rule.metric_type]} ≥{" "}
+                  {rule.threshold} · cooldown {rule.cooldown_seconds}s ·
+                  debounce {rule.debounce_samples}
                 </p>
               </div>
-              <button
-                onClick={() => void onRestartContainer(rule)}
-                disabled={restartingRuleId === rule.id}
-                className="btn btn-warn px-3 py-1 text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {restartingRuleId === rule.id ? "Redemarrage..." : "Redemarrer le conteneur"}
-              </button>
-              <button onClick={() => void onDelete(rule.id)} className="btn btn-danger px-3 py-1 text-xs">
-                Supprimer
-              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => void onRestartContainer(rule)}
+                    disabled={restartingRuleId === rule.id}
+                    className="btn btn-warn px-3 py-1 text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {restartingRuleId === rule.id
+                      ? "Redémarrage…"
+                      : "Redémarrer le conteneur"}
+                  </button>
+                  <button
+                    onClick={() => void onDelete(rule.id)}
+                    className="btn btn-danger px-3 py-1 text-xs"
+                  >
+                    Supprimer
+                  </button>
+                </>
+              )}
             </li>
           ))}
         </ul>

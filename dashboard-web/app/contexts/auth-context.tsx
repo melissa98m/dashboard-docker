@@ -21,6 +21,8 @@ interface AuthContextValue {
   loading: boolean;
   authenticated: boolean;
   me: AuthMeResponse | null;
+  isAdmin: boolean;
+  apiUnavailable: boolean;
   refreshAuthState: () => Promise<void>;
   openAuthPanel: () => void;
   registerOpenAuthPanel: (fn: () => void) => void;
@@ -31,17 +33,21 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<AuthMeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiUnavailable, setApiUnavailable] = useState(false);
   const openAuthPanelRef = useRef<(() => void) | null>(null);
 
   const refreshAuthState = useCallback(async (): Promise<void> => {
+    setApiUnavailable(false);
     try {
       const response = await apiJson<AuthMeResponse>("/api/auth/me");
       setMe(response);
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 401) {
         setMe(null);
+        setApiUnavailable(false);
       } else {
         setMe(null);
+        setApiUnavailable(true);
       }
     } finally {
       setLoading(false);
@@ -69,7 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener(getAuthEventName(), onAuthError as EventListener);
     return () => {
-      window.removeEventListener(getAuthEventName(), onAuthError as EventListener);
+      window.removeEventListener(
+        getAuthEventName(),
+        onAuthError as EventListener
+      );
     };
   }, [refreshAuthState]);
 
@@ -77,16 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     authenticated: me?.authenticated ?? false,
     me,
+    isAdmin: me?.role === "admin",
+    apiUnavailable,
     refreshAuthState,
     openAuthPanel,
     registerOpenAuthPanel,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {
