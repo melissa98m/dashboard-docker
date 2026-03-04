@@ -21,6 +21,9 @@ jobs:
           echo "DATABASE_URL=sqlite:////tmp/dashboard.db" >> .env
           echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
 
+      - name: Build Docker images
+        run: make build
+
       - name: Lint API + Web
         run: make lint-ci
 
@@ -29,9 +32,6 @@ jobs:
 
       - name: Run tests
         run: make test-ci
-
-      - name: Build Docker images
-        run: make build
 
   deploy:
     needs: test
