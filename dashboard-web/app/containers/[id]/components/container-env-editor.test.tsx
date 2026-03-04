@@ -10,9 +10,12 @@ const updateContainerEnvProfile = vi.fn();
 const applyContainerEnvProfile = vi.fn();
 
 vi.mock("../../../lib/container-env-api", () => ({
-  getContainerEnvProfile: (...args: unknown[]) => getContainerEnvProfile(...args),
-  updateContainerEnvProfile: (...args: unknown[]) => updateContainerEnvProfile(...args),
-  applyContainerEnvProfile: (...args: unknown[]) => applyContainerEnvProfile(...args),
+  getContainerEnvProfile: (...args: unknown[]) =>
+    getContainerEnvProfile(...args),
+  updateContainerEnvProfile: (...args: unknown[]) =>
+    updateContainerEnvProfile(...args),
+  applyContainerEnvProfile: (...args: unknown[]) =>
+    applyContainerEnvProfile(...args),
 }));
 
 async function flush() {
@@ -79,7 +82,10 @@ describe("ContainerEnvEditor", () => {
       new_container_id: "new123",
       warnings: [],
     });
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true)
+    );
   });
 
   afterEach(() => {
@@ -97,21 +103,23 @@ describe("ContainerEnvEditor", () => {
     await flush();
     expect(getContainerEnvProfile).toHaveBeenCalledWith("abc123");
 
-    const toggleButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Afficher")
+    const toggleButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Afficher")
     );
     expect(toggleButton).toBeTruthy();
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    const fooInput = inputs.find((input) => (input as HTMLInputElement).value === "bar");
+    const fooInput = inputs.find(
+      (input) => (input as HTMLInputElement).value === "bar"
+    );
     expect(fooInput).toBeTruthy();
     await act(async () => {
       setInputValue(fooInput as HTMLInputElement, "new");
     });
     await flush();
 
-    const saveButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Sauvegarder le brouillon")
+    const saveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Sauvegarder le brouillon")
     );
     expect(saveButton).toBeTruthy();
     await act(async () => {
@@ -120,8 +128,8 @@ describe("ContainerEnvEditor", () => {
     await flush();
     expect(updateContainerEnvProfile).toHaveBeenCalled();
 
-    const applyButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Appliquer (recreate)")
+    const applyButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Appliquer (recreate)")
     );
     expect(applyButton).toBeTruthy();
     await act(async () => {

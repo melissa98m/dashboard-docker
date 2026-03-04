@@ -52,7 +52,10 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const dirty = useMemo(() => hasDifferences(draft, baseDraft), [draft, baseDraft]);
+  const dirty = useMemo(
+    () => hasDifferences(draft, baseDraft),
+    [draft, baseDraft]
+  );
 
   const loadProfile = useCallback(async () => {
     setBusy(true);
@@ -65,7 +68,9 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
       setBaseDraft(nextDraft);
       setVisibleKeys({});
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement des variables");
+      setError(
+        e instanceof Error ? e.message : "Erreur de chargement des variables"
+      );
     } finally {
       setBusy(false);
     }
@@ -77,7 +82,10 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
 
   const sortedKeys = useMemo(() => Object.keys(draft).sort(), [draft]);
   const filteredKeys = useMemo(
-    () => sortedKeys.filter((key) => key.toLowerCase().includes(search.trim().toLowerCase())),
+    () =>
+      sortedKeys.filter((key) =>
+        key.toLowerCase().includes(search.trim().toLowerCase())
+      ),
     [sortedKeys, search]
   );
 
@@ -113,7 +121,12 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
     }
     setDraft((previous) => ({
       ...previous,
-      [trimmedKey]: { value: newValue, sensitive: /(token|secret|password|api[_-]?key|pwd|auth)/i.test(trimmedKey) },
+      [trimmedKey]: {
+        value: newValue,
+        sensitive: /(token|secret|password|api[_-]?key|pwd|auth)/i.test(
+          trimmedKey
+        ),
+      },
     }));
     setNewKey("");
     setNewValue("");
@@ -142,7 +155,9 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
       setDraft(nextDraft);
       setBaseDraft(nextDraft);
       setVisibleKeys({});
-      setInfo("Variables enregistrées. Clique sur Appliquer pour recréer le conteneur.");
+      setInfo(
+        "Variables enregistrées. Clique sur Appliquer pour recréer le conteneur."
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur de sauvegarde");
     } finally {
@@ -153,7 +168,8 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
   const applyChanges = async () => {
     const confirmed = await confirm({
       title: "Appliquer la configuration",
-      message: "Appliquer les changements d’environnement va recréer ce conteneur. Continuer ?",
+      message:
+        "Appliquer les changements d’environnement va recréer ce conteneur. Continuer ?",
       confirmLabel: "Appliquer",
       cancelLabel: "Annuler",
       tone: "danger",
@@ -182,7 +198,11 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
   };
 
   if (busy && profile == null) {
-    return <p className="text-sm text-slate-400">Chargement des variables d’environnement...</p>;
+    return (
+      <p className="text-sm text-slate-400">
+        Chargement des variables d’environnement...
+      </p>
+    );
   }
 
   return (
@@ -190,11 +210,14 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">Variables d’environnement</h2>
         <div className="text-xs text-slate-400">
-          source: {profile?.source_mode ?? "n/a"} {profile?.writable ? "(modifiable)" : "(lecture seule)"}
+          source: {profile?.source_mode ?? "n/a"}{" "}
+          {profile?.writable ? "(modifiable)" : "(lecture seule)"}
         </div>
       </div>
       {profile?.detected_env_file && (
-        <p className="text-xs text-slate-400 break-all">fichier détecté: {profile.detected_env_file}</p>
+        <p className="text-xs text-slate-400 break-all">
+          fichier détecté: {profile.detected_env_file}
+        </p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         <label>
@@ -249,11 +272,16 @@ export function ContainerEnvEditor({ containerId }: { containerId: string }) {
                 value={draft[key].value}
                 sensitive={draft[key].sensitive}
                 visible={Boolean(visibleKeys[key])}
-                changed={!baseDraft[key] || baseDraft[key].value !== draft[key].value}
+                changed={
+                  !baseDraft[key] || baseDraft[key].value !== draft[key].value
+                }
                 onValueChange={(value) => setValue(key, value)}
                 onDelete={() => removeKey(key)}
                 onToggleVisibility={() =>
-                  setVisibleKeys((previous) => ({ ...previous, [key]: !previous[key] }))
+                  setVisibleKeys((previous) => ({
+                    ...previous,
+                    [key]: !previous[key],
+                  }))
                 }
               />
             ))}

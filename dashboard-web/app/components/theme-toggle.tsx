@@ -45,7 +45,9 @@ export default function ThemeToggle() {
       className="theme-toggle"
       aria-label="Changer de thème"
       disabled={!ready}
-      title={theme === "dark" ? "Activer le thème clair" : "Activer le thème sombre"}
+      title={
+        theme === "dark" ? "Activer le thème clair" : "Activer le thème sombre"
+      }
     >
       <span aria-hidden="true">{theme === "dark" ? "DK" : "LT"}</span>
       <span>{theme === "dark" ? "Dark" : "Light"}</span>

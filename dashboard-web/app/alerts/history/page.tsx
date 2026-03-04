@@ -56,6 +56,7 @@ async function fetchContainersWithRetry(
 }
 
 export default function AlertsHistoryPage() {
+  const { isAdmin } = useAuth();
   const notify = useNotifications();
   const [history, setHistory] = useState<AlertHistoryItem[]>([]);
   const [containers, setContainers] = useState<ContainerOption[]>([]);

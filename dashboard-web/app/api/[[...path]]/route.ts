@@ -5,7 +5,9 @@
 import { NextResponse } from "next/server";
 
 const API_UPSTREAM =
-  process.env.API_UPSTREAM_URL || process.env.NEXT_PUBLIC_API_UPSTREAM_URL || "http://localhost:8000";
+  process.env.API_UPSTREAM_URL ||
+  process.env.NEXT_PUBLIC_API_UPSTREAM_URL ||
+  "http://localhost:8000";
 
 function buildUpstreamUrl(path: string[]): string {
   const pathStr = path.length > 0 ? path.join("/") : "";
@@ -18,7 +20,11 @@ async function proxyRequest(
   path: string[],
   method: string
 ): Promise<NextResponse> {
-  const url = buildUpstreamUrl(path);
+  let url = buildUpstreamUrl(path);
+  const requestUrl = new URL(request.url);
+  if (requestUrl.search) {
+    url += requestUrl.search;
+  }
   const headers = new Headers(request.headers);
   // Remove host to avoid upstream rejecting
   headers.delete("host");
@@ -38,7 +44,15 @@ async function proxyRequest(
     body: body && body.length > 0 ? body : undefined,
   });
 
-  const responseHeaders = new Headers(res.headers);
+  // Preserve multiple Set-Cookie headers (session + csrf); plain Headers(res.headers) can drop some
+  const responseHeaders = new Headers();
+  Array.from(res.headers.entries()).forEach(([key, value]) => {
+    if (key.toLowerCase() === "set-cookie") {
+      responseHeaders.append("Set-Cookie", value);
+    } else {
+      responseHeaders.set(key, value);
+    }
+  });
   return new NextResponse(res.body, {
     status: res.status,
     statusText: res.statusText,
@@ -48,37 +62,55 @@ async function proxyRequest(
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
   const { path = [] } = await params;
   const pathArray = Array.isArray(path) ? path : [path].filter(Boolean);
   return proxyRequest(request, pathArray, "GET");
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
   const { path = [] } = await params;
   const pathArray = Array.isArray(path) ? path : [path].filter(Boolean);
   return proxyRequest(request, pathArray, "POST");
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
   const { path = [] } = await params;
   const pathArray = Array.isArray(path) ? path : [path].filter(Boolean);
   return proxyRequest(request, pathArray, "PATCH");
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
   const { path = [] } = await params;
   const pathArray = Array.isArray(path) ? path : [path].filter(Boolean);
   return proxyRequest(request, pathArray, "DELETE");
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
   const { path = [] } = await params;
   const pathArray = Array.isArray(path) ? path : [path].filter(Boolean);
   return proxyRequest(request, pathArray, "PUT");
 }
 
-export async function OPTIONS(request: Request, { params }: { params: Promise<{ path?: string[] }> }) {
+export async function OPTIONS(
+  request: Request,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
   const { path = [] } = await params;
   const pathArray = Array.isArray(path) ? path : [path].filter(Boolean);
   return proxyRequest(request, pathArray, "OPTIONS");

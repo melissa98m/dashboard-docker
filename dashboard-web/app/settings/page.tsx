@@ -85,7 +85,8 @@ function computeServiceHealth(params: {
   consecutiveErrors: number;
   pollSeconds: number;
 }): ServiceHealth {
-  const { enabled, running, lastSuccessAt, consecutiveErrors, pollSeconds } = params;
+  const { enabled, running, lastSuccessAt, consecutiveErrors, pollSeconds } =
+    params;
   if (!enabled) return "unknown";
   if (!running || consecutiveErrors > 0) return "warning";
   if (!lastSuccessAt) return "warning";
@@ -142,7 +143,8 @@ function computeGlobalHealth(params: {
 }): GlobalHealthStatus {
   const { depsOk, alertHealth, auditRetentionHealth } = params;
   if (!depsOk) return "degraded";
-  if (alertHealth === "warning" || auditRetentionHealth === "warning") return "warning";
+  if (alertHealth === "warning" || auditRetentionHealth === "warning")
+    return "warning";
   return "healthy";
 }
 
@@ -150,7 +152,10 @@ function GlobalHealthBadge({ status }: { status: GlobalHealthStatus }) {
   if (status === "healthy") {
     return (
       <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600/25 text-emerald-300 border border-emerald-500/40">
-        <span className="size-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+        <span
+          className="size-2 rounded-full bg-emerald-400 animate-pulse"
+          aria-hidden
+        />
         Opérationnel
       </span>
     );
@@ -184,7 +189,10 @@ function DepCheckRow({
     <div className="entity-card flex items-center justify-between gap-4">
       <span className="truncate">{label}</span>
       <div className="flex items-center gap-2 shrink-0 min-w-0">
-        <span className="text-xs text-slate-400 truncate max-w-[10rem] sm:max-w-[16rem]" title={detail}>
+        <span
+          className="text-xs text-slate-400 truncate max-w-[10rem] sm:max-w-[16rem]"
+          title={detail}
+        >
           {detail}
         </span>
         <span
@@ -206,7 +214,8 @@ export default function SettingsPage() {
   const { me } = useAuth();
   const [status, setStatus] = useState<SecurityStatus | null>(null);
   const [deps, setDeps] = useState<DependenciesHealth | null>(null);
-  const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings | null>(null);
+  const [runtimeSettings, setRuntimeSettings] =
+    useState<RuntimeSettings | null>(null);
   const [form, setForm] = useState<RuntimeSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -282,7 +291,9 @@ export default function SettingsPage() {
       return;
     }
     if (newPassword.length < 12) {
-      setCreateUserError("Mot de passe : minimum 12 caractères, lettres et chiffres.");
+      setCreateUserError(
+        "Mot de passe : minimum 12 caractères, lettres et chiffres."
+      );
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -333,7 +344,10 @@ export default function SettingsPage() {
 
   const loadedAt = new Date(status.runtime_config_loaded_at);
   const now = new Date();
-  const uptimeSeconds = Math.max(0, Math.floor((now.getTime() - loadedAt.getTime()) / 1000));
+  const uptimeSeconds = Math.max(
+    0,
+    Math.floor((now.getTime() - loadedAt.getTime()) / 1000)
+  );
   const alertHealth = computeServiceHealth({
     enabled: status.alert_engine_enabled,
     running: status.alert_engine_running,
@@ -357,7 +371,9 @@ export default function SettingsPage() {
   return (
     <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
       <div className="page-header">
-        <h1 className="page-title text-2xl font-bold">Parametres de securite</h1>
+        <h1 className="page-title text-2xl font-bold">
+          Parametres de securite
+        </h1>
         <div className="top-nav">
           <Link href="/audit">Audit</Link>
           <Link href="/">Dashboard</Link>
@@ -520,7 +536,9 @@ export default function SettingsPage() {
               />
             </label>
             <label>
-              <span className="field-label">Intervalle polling alertes (s)</span>
+              <span className="field-label">
+                Intervalle polling alertes (s)
+              </span>
               <input
                 type="number"
                 min={1}
@@ -552,7 +570,9 @@ export default function SettingsPage() {
               />
             </label>
             <label>
-              <span className="field-label">Fenetre limite token redemarrage (s)</span>
+              <span className="field-label">
+                Fenetre limite token redemarrage (s)
+              </span>
               <input
                 type="number"
                 min={10}
@@ -561,14 +581,18 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    restart_token_rate_limit_window_seconds: Number(e.target.value),
+                    restart_token_rate_limit_window_seconds: Number(
+                      e.target.value
+                    ),
                   })
                 }
                 className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
               />
             </label>
             <label>
-              <span className="field-label">Max tentatives token redemarrage</span>
+              <span className="field-label">
+                Max tentatives token redemarrage
+              </span>
               <input
                 type="number"
                 min={1}
@@ -577,7 +601,9 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    restart_token_rate_limit_max_attempts: Number(e.target.value),
+                    restart_token_rate_limit_max_attempts: Number(
+                      e.target.value
+                    ),
                   })
                 }
                 className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
@@ -600,7 +626,9 @@ export default function SettingsPage() {
               />
             </label>
             <label>
-              <span className="field-label">Purge auto retention audit active</span>
+              <span className="field-label">
+                Purge auto retention audit active
+              </span>
               <input
                 type="checkbox"
                 checked={form.audit_retention_auto_enabled}
@@ -614,7 +642,9 @@ export default function SettingsPage() {
               />
             </label>
             <label>
-              <span className="field-label">Intervalle purge retention audit (s)</span>
+              <span className="field-label">
+                Intervalle purge retention audit (s)
+              </span>
               <input
                 type="number"
                 min={10}
@@ -637,7 +667,11 @@ export default function SettingsPage() {
               >
                 {saving ? "Enregistrement..." : "Enregistrer"}
               </button>
-              <button type="button" onClick={onReset} className="btn btn-neutral">
+              <button
+                type="button"
+                onClick={onReset}
+                className="btn btn-neutral"
+              >
                 Reinitialiser
               </button>
             </div>
@@ -696,7 +730,9 @@ export default function SettingsPage() {
               <span className="field-label">Rôle</span>
               <select
                 value={newRole}
-                onChange={(e) => setNewRole(e.target.value as "viewer" | "admin")}
+                onChange={(e) =>
+                  setNewRole(e.target.value as "viewer" | "admin")
+                }
                 className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
               >
                 <option value="viewer">Viewer (lecture seule)</option>
@@ -708,7 +744,9 @@ export default function SettingsPage() {
               disabled={createUserSubmitting}
               className="btn btn-success disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {createUserSubmitting ? "Création..." : "Créer l&apos;utilisateur"}
+              {createUserSubmitting
+                ? "Création..."
+                : "Créer l&apos;utilisateur"}
             </button>
           </form>
         </section>
@@ -720,22 +758,59 @@ export default function SettingsPage() {
         <p>Intervalle polling alertes: {status.alert_poll_seconds}s</p>
         <p>TTL token redemarrage: {status.restart_action_ttl_seconds}s</p>
         <p>
-          Limite token redemarrage: {status.restart_token_rate_limit_max_attempts} tentatives /{" "}
+          Limite token redemarrage:{" "}
+          {status.restart_token_rate_limit_max_attempts} tentatives /{" "}
           {status.restart_token_rate_limit_window_seconds}s
         </p>
         <p>Retention audit: {status.audit_retention_days} jours</p>
-        <p>Intervalle purge retention audit: {status.audit_retention_poll_seconds}s</p>
-        <p>Dernier cycle moteur alertes: {formatTimestamp(status.alert_engine_last_cycle_at)}</p>
-        <p>Dernier succes moteur alertes: {formatTimestamp(status.alert_engine_last_success_at)}</p>
-        <p>Erreurs consecutives moteur alertes: {status.alert_engine_consecutive_errors}</p>
-        <p>Derniere erreur moteur alertes: {status.alert_engine_last_error_reason ?? "n/a"}</p>
-        <p>Date derniere erreur moteur alertes: {formatTimestamp(status.alert_engine_last_error_at)}</p>
-        <p>Dernier cycle retention audit: {formatTimestamp(status.audit_retention_last_cycle_at)}</p>
-        <p>Dernier succes retention audit: {formatTimestamp(status.audit_retention_last_success_at)}</p>
-        <p>Erreurs consecutives retention audit: {status.audit_retention_consecutive_errors}</p>
-        <p>Derniere erreur retention audit: {status.audit_retention_last_error_reason ?? "n/a"}</p>
-        <p>Date derniere erreur retention audit: {formatTimestamp(status.audit_retention_last_error_at)}</p>
-        <p>Config chargee le: {new Date(status.runtime_config_loaded_at).toLocaleString()}</p>
+        <p>
+          Intervalle purge retention audit:{" "}
+          {status.audit_retention_poll_seconds}s
+        </p>
+        <p>
+          Dernier cycle moteur alertes:{" "}
+          {formatTimestamp(status.alert_engine_last_cycle_at)}
+        </p>
+        <p>
+          Dernier succes moteur alertes:{" "}
+          {formatTimestamp(status.alert_engine_last_success_at)}
+        </p>
+        <p>
+          Erreurs consecutives moteur alertes:{" "}
+          {status.alert_engine_consecutive_errors}
+        </p>
+        <p>
+          Derniere erreur moteur alertes:{" "}
+          {status.alert_engine_last_error_reason ?? "n/a"}
+        </p>
+        <p>
+          Date derniere erreur moteur alertes:{" "}
+          {formatTimestamp(status.alert_engine_last_error_at)}
+        </p>
+        <p>
+          Dernier cycle retention audit:{" "}
+          {formatTimestamp(status.audit_retention_last_cycle_at)}
+        </p>
+        <p>
+          Dernier succes retention audit:{" "}
+          {formatTimestamp(status.audit_retention_last_success_at)}
+        </p>
+        <p>
+          Erreurs consecutives retention audit:{" "}
+          {status.audit_retention_consecutive_errors}
+        </p>
+        <p>
+          Derniere erreur retention audit:{" "}
+          {status.audit_retention_last_error_reason ?? "n/a"}
+        </p>
+        <p>
+          Date derniere erreur retention audit:{" "}
+          {formatTimestamp(status.audit_retention_last_error_at)}
+        </p>
+        <p>
+          Config chargee le:{" "}
+          {new Date(status.runtime_config_loaded_at).toLocaleString()}
+        </p>
         <p>Uptime API (approx): {formatDuration(uptimeSeconds)}</p>
         <p>
           Regles de masquage par defaut:{" "}
@@ -743,7 +818,10 @@ export default function SettingsPage() {
             ? status.log_snapshot_redaction_default_rules.join(", ")
             : "aucune"}
         </p>
-        <p>Nombre de regles de masquage additionnelles: {status.log_snapshot_redaction_extra_rules_count}</p>
+        <p>
+          Nombre de regles de masquage additionnelles:{" "}
+          {status.log_snapshot_redaction_extra_rules_count}
+        </p>
       </section>
     </main>
   );

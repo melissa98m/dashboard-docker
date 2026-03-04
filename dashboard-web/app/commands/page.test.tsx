@@ -74,7 +74,10 @@ describe("Commands live page stream reconnect flow", () => {
     root = createRoot(container);
 
     MockEventSource.instances = [];
-    vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
+    vi.stubGlobal(
+      "EventSource",
+      MockEventSource as unknown as typeof EventSource
+    );
 
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -139,13 +142,15 @@ describe("Commands live page stream reconnect flow", () => {
     await flush();
 
     expect(container.textContent).toContain("etat: error");
-    const reconnectButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("Reconnecter")
-    );
+    const reconnectButton = Array.from(
+      container.querySelectorAll("button")
+    ).find((button) => button.textContent?.includes("Reconnecter"));
     expect(reconnectButton).toBeTruthy();
 
     await act(async () => {
-      reconnectButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      reconnectButton?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true })
+      );
     });
     await flush();
 

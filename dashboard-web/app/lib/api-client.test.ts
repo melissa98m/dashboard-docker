@@ -10,7 +10,11 @@ import {
 
 function buildJsonResponse(
   body: unknown,
-  { ok = true, status = 200, statusText = "OK" }: { ok?: boolean; status?: number; statusText?: string } = {}
+  {
+    ok = true,
+    status = 200,
+    statusText = "OK",
+  }: { ok?: boolean; status?: number; statusText?: string } = {}
 ): Response {
   return {
     ok,
@@ -53,9 +57,14 @@ describe("api-client", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(apiFetch("/api/containers")).rejects.toBeInstanceOf(ApiClientError);
+    await expect(apiFetch("/api/containers")).rejects.toBeInstanceOf(
+      ApiClientError
+    );
     expect(listener).toHaveBeenCalledTimes(1);
-    const event = listener.mock.calls[0][0] as CustomEvent<{ status: number; message: string }>;
+    const event = listener.mock.calls[0][0] as CustomEvent<{
+      status: number;
+      message: string;
+    }>;
     expect(event.detail.status).toBe(401);
     expect(event.detail.message).toContain("Unauthorized");
   });
