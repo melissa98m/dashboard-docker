@@ -99,7 +99,14 @@ export default function AuthAccessPanel() {
         <span>{buttonLabel}</span>
       </button>
       {isOpen && (
-        <div className="auth-panel-popover panel">
+        <>
+          <button
+            type="button"
+            className="auth-panel-backdrop"
+            onClick={() => setIsOpen(false)}
+            aria-label="Fermer le formulaire de connexion"
+          />
+          <div className="auth-panel-popover panel">
           <p className="text-sm font-semibold mb-2">Session utilisateur</p>
           {authError && (
             <p className="text-xs text-red-400 mb-2">
@@ -154,7 +161,8 @@ export default function AuthAccessPanel() {
               </button>
             </form>
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
