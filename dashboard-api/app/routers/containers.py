@@ -165,6 +165,20 @@ class ContainerActionResponse(BaseModel):
     message: str
 
 
+class LinkedImage(BaseModel):
+    id: str
+    display_name: str
+    tags: list[str]
+
+
+class MountedVolume(BaseModel):
+    type: str
+    name: str | None
+    source: str | None
+    destination: str
+    read_only: bool | None
+
+
 class ContainerDetail(BaseModel):
     id: str
     name: str
@@ -177,10 +191,69 @@ class ContainerDetail(BaseModel):
     health_status: str | None
     last_down_reason: str | None
     last_logs: list[str]
+    linked_images: list[LinkedImage]
+    mounted_volumes: list[MountedVolume]
 
 
 class TokenRestartRequest(BaseModel):
     token: str
+
+
+def _linked_images(container: Any) -> list[LinkedImage]:
+    """Return normalized image metadata for the current container."""
+    tags: list[str] = []
+    image_id = ""
+    display_name = _container_image_ref(container)
+    try:
+        raw_tags = getattr(container.image, "tags", None) or []
+        tags = [str(tag) for tag in raw_tags if isinstance(tag, str) and tag.strip()][:20]
+        short_id = getattr(container.image, "short_id", "")
+        if isinstance(short_id, str) and short_id.strip():
+            image_id = short_id
+    except docker.errors.DockerException:
+        pass
+    if not image_id:
+        attrs = getattr(container, "attrs", {}) or {}
+        raw_image_id = attrs.get("Image")
+        if isinstance(raw_image_id, str) and raw_image_id.strip():
+            image_id = raw_image_id[:24]
+    if not image_id:
+        image_id = display_name
+    return [LinkedImage(id=image_id, display_name=display_name, tags=tags)]
+
+
+def _mounted_volumes(attrs: dict[str, Any]) -> list[MountedVolume]:
+    """Extract container mounts without extra Docker API calls."""
+    mounts = attrs.get("Mounts")
+    if not isinstance(mounts, list):
+        return []
+    items: list[MountedVolume] = []
+    seen: set[tuple[str, str, str]] = set()
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            continue
+        mount_type = str(mount.get("Type") or "unknown")
+        destination = str(mount.get("Destination") or "").strip()
+        if not destination:
+            continue
+        name = str(mount.get("Name") or "").strip()
+        source = str(mount.get("Source") or "").strip()
+        unique_key = (mount_type, name or source, destination)
+        if unique_key in seen:
+            continue
+        seen.add(unique_key)
+        rw = mount.get("RW")
+        items.append(
+            MountedVolume(
+                type=mount_type,
+                name=name or None,
+                source=source or None,
+                destination=destination,
+                read_only=(not rw) if isinstance(rw, bool) else None,
+            )
+        )
+    items.sort(key=lambda item: item.destination)
+    return items
 
 
 class ContainerCommandSpecItem(BaseModel):
@@ -520,6 +593,8 @@ def get_container_detail(
             health_status=health.get("Status"),
             last_down_reason=_last_down_reason(state),
             last_logs=logs,
+            linked_images=_linked_images(container),
+            mounted_volumes=_mounted_volumes(attrs),
         )
     except docker.errors.NotFound:
         raise HTTPException(status_code=404, detail="Container not found")

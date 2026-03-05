@@ -22,6 +22,22 @@ interface ContainerDetail {
   health_status: string | null;
   last_down_reason: string | null;
   last_logs: string[];
+  linked_images: LinkedImage[];
+  mounted_volumes: MountedVolume[];
+}
+
+interface LinkedImage {
+  id: string;
+  display_name: string;
+  tags: string[];
+}
+
+interface MountedVolume {
+  type: string;
+  name: string | null;
+  source: string | null;
+  destination: string;
+  read_only: boolean | null;
 }
 
 interface StatsPayload {
@@ -191,6 +207,66 @@ export default function ContainerDetailPage({
             Raison down: {detail.last_down_reason}
           </p>
         )}
+      </section>
+
+      <section className="panel">
+        <h2 className="font-semibold mb-2">Ressources liées</h2>
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm text-slate-300">Images</p>
+            {detail.linked_images.length === 0 ? (
+              <p className="text-xs text-slate-500 mt-1">Aucune image liée.</p>
+            ) : (
+              <ul className="mt-1 space-y-1 text-sm">
+                {detail.linked_images.map((img) => (
+                  <li key={img.id}>
+                    <Link
+                      href={`/images/${encodeURIComponent(img.id)}`}
+                      className="text-sky-400 hover:underline"
+                    >
+                      {img.display_name}
+                    </Link>
+                    {img.tags.length > 0 && (
+                      <span className="text-xs text-slate-500 ml-2">
+                        ({img.tags.length} tag{img.tags.length > 1 ? "s" : ""})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-slate-300">Volumes / montages</p>
+            {detail.mounted_volumes.length === 0 ? (
+              <p className="text-xs text-slate-500 mt-1">Aucun montage.</p>
+            ) : (
+              <ul className="mt-1 space-y-1 text-sm">
+                {detail.mounted_volumes.map((mount) => {
+                  const key = `${mount.type}-${mount.destination}-${mount.source ?? mount.name ?? "none"}`;
+                  return (
+                    <li key={key}>
+                      {mount.type === "volume" && mount.name ? (
+                        <Link
+                          href={`/volumes/${encodeURIComponent(mount.name)}`}
+                          className="text-sky-400 hover:underline"
+                        >
+                          {mount.name}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-300">{mount.source ?? "mount"}</span>
+                      )}
+                      <span className="text-slate-500"> → {mount.destination}</span>
+                      {mount.read_only === true && (
+                        <span className="text-xs text-amber-300 ml-2">(read-only)</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="panel">
