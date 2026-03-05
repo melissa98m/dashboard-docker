@@ -734,7 +734,9 @@ def create_mfa_enrollment(*, user_id: int, secret_encrypted: str) -> tuple[str, 
     ).isoformat()
     with sqlite3.connect(get_db_path()) as conn:
         conn.execute(
-            "UPDATE auth_mfa_enrollments SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
+            "UPDATE auth_mfa_enrollments "
+            "SET consumed_at = ? "
+            "WHERE user_id = ? AND consumed_at IS NULL",
             (now, user_id),
         )
         conn.execute(
