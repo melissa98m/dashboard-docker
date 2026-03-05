@@ -247,10 +247,7 @@ export default function SettingsPage() {
   const [mfaDisablePassword, setMfaDisablePassword] = useState("");
   const [mfaDisableCode, setMfaDisableCode] = useState("");
 
-  const mfaJson = async <T,>(
-    path: string,
-    init?: RequestInit
-  ): Promise<T> => {
+  const mfaJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
     const response = await fetch(path, {
       ...init,
       credentials: "include",
@@ -306,7 +303,9 @@ export default function SettingsPage() {
     setMfaStatusLoading(true);
     void (async () => {
       try {
-        const payload = await mfaJson<TotpStatusResponse>("/api/auth/2fa/status");
+        const payload = await mfaJson<TotpStatusResponse>(
+          "/api/auth/2fa/status"
+        );
         setMfaEnabled(payload.enabled);
       } catch (e) {
         setMfaError(e instanceof Error ? e.message : "Erreur MFA");
@@ -325,8 +324,7 @@ export default function SettingsPage() {
     void (async () => {
       try {
         const qrCode = await import("qrcode");
-        const toDataURL =
-          qrCode.toDataURL ?? qrCode.default?.toDataURL ?? null;
+        const toDataURL = qrCode.toDataURL ?? qrCode.default?.toDataURL ?? null;
         if (!toDataURL) throw new Error("QR encoder unavailable");
         const dataUrl = await toDataURL(mfaSetup.otpauth_uri, {
           errorCorrectionLevel: "M",
@@ -676,7 +674,10 @@ export default function SettingsPage() {
           </form>
         )}
         {mfaEnabled && !mfaSetup && (
-          <form className="space-y-2 pt-2 border-t border-slate-700/60" onSubmit={onDisableMfa}>
+          <form
+            className="space-y-2 pt-2 border-t border-slate-700/60"
+            onSubmit={onDisableMfa}
+          >
             <p className="text-xs text-slate-400">
               Désactivation OTP (action sensible).
             </p>

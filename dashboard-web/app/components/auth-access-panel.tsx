@@ -50,10 +50,7 @@ export default function AuthAccessPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<AuthErrorDetail | null>(null);
 
-  const mfaJson = async <T,>(
-    path: string,
-    init?: RequestInit
-  ): Promise<T> => {
+  const mfaJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
     const response = await fetch(path, {
       ...init,
       credentials: "include",
@@ -111,7 +108,9 @@ export default function AuthAccessPanel() {
     }
     void (async () => {
       try {
-        const payload = await mfaJson<TotpStatusResponse>("/api/auth/2fa/status");
+        const payload = await mfaJson<TotpStatusResponse>(
+          "/api/auth/2fa/status"
+        );
         setTotpEnabled(payload.enabled);
         if (payload.enabled) {
           setTotpEnrollmentRequired(false);
@@ -131,8 +130,7 @@ export default function AuthAccessPanel() {
     void (async () => {
       try {
         const qrCode = await import("qrcode");
-        const toDataURL =
-          qrCode.toDataURL ?? qrCode.default?.toDataURL ?? null;
+        const toDataURL = qrCode.toDataURL ?? qrCode.default?.toDataURL ?? null;
         if (!toDataURL) throw new Error("QR encoder unavailable");
         const nextUrl = await toDataURL(totpSetup.otpauth_uri, {
           errorCorrectionLevel: "M",
@@ -169,7 +167,9 @@ export default function AuthAccessPanel() {
       setOtpCode("");
       setAuthError(null);
       await refreshAuthState();
-      const statusPayload = await mfaJson<TotpStatusResponse>("/api/auth/2fa/status");
+      const statusPayload = await mfaJson<TotpStatusResponse>(
+        "/api/auth/2fa/status"
+      );
       setTotpEnabled(statusPayload.enabled);
       if (!statusPayload.enabled) {
         setTotpEnrollmentRequired(true);
@@ -297,8 +297,8 @@ export default function AuthAccessPanel() {
         <p className="text-sm font-semibold mb-2">Session utilisateur</p>
         {totpEnrollmentRequired && (
           <p className="text-xs text-amber-300 mb-2">
-            Configuration OTP requise: scanne le QR code puis valide le code à
-            6 chiffres.
+            Configuration OTP requise: scanne le QR code puis valide le code à 6
+            chiffres.
           </p>
         )}
         {authError && (
