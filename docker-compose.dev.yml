@@ -1,0 +1,9 @@
+services:
+  dashboard-web:
+    environment:
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
+    command: >
+      sh -c "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm ci; fi &&
+      npm run dev -- --hostname 0.0.0.0 --port 3000"

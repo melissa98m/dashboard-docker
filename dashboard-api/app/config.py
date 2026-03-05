@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     auth_cookie_samesite: str = "lax"
     auth_failed_login_limit: int = 5
     auth_lockout_minutes: int = 15
+    auth_mfa_issuer: str = "Dashboard"
+    auth_mfa_totp_window_steps: int = 1
+    auth_mfa_challenge_ttl_seconds: int = 300
+    auth_mfa_challenge_max_attempts: int = 5
+    auth_mfa_enrollment_ttl_seconds: int = 600
     auth_session_retention_auto_enabled: bool = True
     auth_session_retention_poll_seconds: int = 3600
     auth_bootstrap_admin_username: str | None = None

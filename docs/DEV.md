@@ -7,20 +7,22 @@
 
 ## Quickstart
 - Config: `cp .env.example .env`
-- Start: `make up` ou `docker compose up -d --build`
+- Start: `make up` ou `docker compose up -d`
 - Logs: `make logs` ou `docker compose logs -f --tail=200`
-- Mode dev (logs attachés): `make dev`
+- Mode dev (logs attachés + hot reload web, sans rebuild à chaque changement): `make dev`
 - Shell (api): `make shell-api` ou `docker compose exec dashboard-api sh`
 - Shell (web): `make shell-web` ou `docker compose exec dashboard-web sh`
 
 ## Standard commands (must exist)
 - Lint: `make lint` (nécessite `make up` pour exec) ; `make lint-ci` (CI, sans stack démarrée)
 - Tests: `make test` ; CI: `make test-ci` (fail-fast, sortie concise)
-- E2E: `make test-e2e` — nécessite `make up` et Node.js sur l’hôte. Premier lancement : `cd dashboard-web && npm install && npx playwright install chromium`. Creds optionnels (`E2E_USERNAME`, `E2E_PASSWORD`) pour les tests authentifiés.
+- E2E: `make test-e2e` — exécution Docker-first via service Playwright dédié (`dashboard-e2e`), sans dépendance Node/npm sur l’hôte. La commande démarre automatiquement `dashboard-api` + `dashboard-web`. Creds optionnels (`E2E_USERNAME`, `E2E_PASSWORD`) pour les tests authentifiés.
 - Format: `make format` ; vérif: `make format-check` (CI)
 - Build: `make build`
 - Purge audit logs: `make purge-audit`
 - Restart: `make restart`
+- Rebuild explicite en mode normal: `make up-build`
+- Rebuild explicite en mode dev: `make dev-build`
 - État conteneurs: `make ps`
 - Sauvegarde DB: `make db-backup` (services démarrés requis)
 - Nettoyage cache Docker: `make clean`
@@ -29,7 +31,7 @@
 ## Notes
 - Any change that adds dependencies must be proposed and validated first.
 - Any docker exec feature must be allowlisted + audited.
-- Auth stricte : `AUTH_ENABLED=true` (session cookies + CSRF). Toute l’API requiert une session valide sauf `/api/auth/login` et `/health`.
+- Auth stricte : `AUTH_ENABLED=true` (session cookies + CSRF). Toute l’API requiert une session valide sauf `/api/auth/login`, `/api/auth/login/verify-2fa` et `/health`.
 - Tune `SSE_MAX_CONNECTIONS` for Raspberry Pi capacity.
 - Alert auto-evaluation runs in background (`ALERT_ENGINE_ENABLED=true`) every `ALERT_POLL_SECONDS`.
 - Event watcher (`EVENT_WATCHER_ENABLED=true`) listens to Docker container die/oom events; on detection, fetches last logs, writes audit, sends ntfy notification with restart link. Optional topic override: `EVENT_WATCHER_NTFY_TOPIC`. Status visible in `GET /api/system/security-status` (`event_watcher_enabled`, `event_watcher_running`).

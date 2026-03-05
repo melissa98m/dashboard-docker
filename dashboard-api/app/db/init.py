@@ -57,6 +57,54 @@ def migrate() -> None:
             conn.execute("ALTER TABLE executions ADD COLUMN status TEXT NOT NULL DEFAULT 'queued'")
         if execution_columns and "duration_ms" not in execution_column_names:
             conn.execute("ALTER TABLE executions ADD COLUMN duration_ms INTEGER")
+
+        user_columns = conn.execute("PRAGMA table_info(users)").fetchall()
+        user_column_names = {
+            column[1] for column in user_columns if isinstance(column, tuple) and len(column) > 1
+        }
+        if user_columns and "totp_enabled" not in user_column_names:
+            conn.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
+        if user_columns and "totp_secret_encrypted" not in user_column_names:
+            conn.execute("ALTER TABLE users ADD COLUMN totp_secret_encrypted TEXT")
+        if user_columns and "totp_enabled_at" not in user_column_names:
+            conn.execute("ALTER TABLE users ADD COLUMN totp_enabled_at TEXT")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_mfa_challenges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                challenge_hash TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                failed_attempts INTEGER NOT NULL DEFAULT 0,
+                consumed_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auth_mfa_challenges_expires "
+            "ON auth_mfa_challenges(expires_at)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_mfa_enrollments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                enrollment_hash TEXT NOT NULL UNIQUE,
+                secret_encrypted TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                consumed_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_auth_mfa_enrollments_expires "
+            "ON auth_mfa_enrollments(expires_at)"
+        )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_executions_container_started "
             "ON executions(container_id, started_at)"

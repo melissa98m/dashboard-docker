@@ -66,6 +66,7 @@ def snapshot_container_logs(container: Any, *, tail: int = 100) -> list[str]:
     """Fetch last N log lines from container with optional redaction."""
     safe_tail = max(1, min(tail, _MAX_LOG_SNAPSHOT_LINES))
     raw_logs = container.logs(tail=safe_tail).decode("utf-8", errors="replace")
+    extra_patterns = _load_extra_log_redaction_patterns()
     lines: list[str] = []
     for line in raw_logs.splitlines():
         if not line.strip():
@@ -74,7 +75,7 @@ def snapshot_container_logs(container: Any, *, tail: int = 100) -> list[str]:
         if settings.log_snapshot_redaction_enabled:
             for pattern, replacement in _DEFAULT_LOG_REDACTION_PATTERNS:
                 sanitized = pattern.sub(replacement, sanitized)
-            for pattern in _load_extra_log_redaction_patterns():
+            for pattern in extra_patterns:
                 sanitized = pattern.sub(_REDACTED, sanitized)
         lines.append(sanitized)
     return lines

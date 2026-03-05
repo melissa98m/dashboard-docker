@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from app.config import settings
 from app.db.auth import create_session, ensure_bootstrap_admin, get_session
 from app.db.init import get_db_path
+from app.security_totp import current_totp_code
 
 
 def test_auth_login_me_logout_flow(client):
@@ -38,7 +39,103 @@ def test_auth_login_me_logout_flow(client):
         assert logout.status_code == 200
 
         me_after_logout = client.get("/api/auth/me")
-        assert me_after_logout.status_code == 401
+        assert me_after_logout.status_code == 200
+        assert me_after_logout.json()["authenticated"] is False
+    finally:
+        settings.auth_enabled = previous_auth_enabled
+        settings.auth_cookie_secure = previous_secure_cookie
+        settings.auth_bootstrap_admin_username = previous_admin_user
+        settings.auth_bootstrap_admin_password = previous_admin_password
+
+
+def test_user_can_enable_mfa_and_login_with_totp(client):
+    from tests.conftest import login_as_admin
+
+    previous_auth_enabled = settings.auth_enabled
+    previous_secure_cookie = settings.auth_cookie_secure
+    previous_admin_user = settings.auth_bootstrap_admin_username
+    previous_admin_password = settings.auth_bootstrap_admin_password
+    try:
+        csrf_token = login_as_admin(client)
+
+        setup = client.post("/api/auth/2fa/setup", headers={"x-csrf-token": csrf_token})
+        assert setup.status_code == 200
+        setup_payload = setup.json()
+        secret = setup_payload["manual_entry_key"]
+        otp = current_totp_code(secret)
+
+        enable = client.post(
+            "/api/auth/2fa/enable",
+            json={
+                "enrollment_token": setup_payload["enrollment_token"],
+                "otp_code": otp,
+            },
+            headers={"x-csrf-token": csrf_token},
+        )
+        assert enable.status_code == 200
+        assert enable.json()["enabled"] is True
+
+        logout = client.post("/api/auth/logout")
+        assert logout.status_code == 200
+
+        first_step = client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "strong-password-123"},
+        )
+        assert first_step.status_code == 200
+        assert first_step.json()["authenticated"] is False
+        assert first_step.json()["mfa_required"] is True
+        challenge = first_step.json()["mfa_token"]
+
+        second_step = client.post(
+            "/api/auth/login/verify-2fa",
+            json={"mfa_token": challenge, "otp_code": current_totp_code(secret)},
+        )
+        assert second_step.status_code == 200
+        assert second_step.json()["authenticated"] is True
+        assert second_step.json()["username"] == "admin"
+    finally:
+        settings.auth_enabled = previous_auth_enabled
+        settings.auth_cookie_secure = previous_secure_cookie
+        settings.auth_bootstrap_admin_username = previous_admin_user
+        settings.auth_bootstrap_admin_password = previous_admin_password
+
+
+def test_mfa_login_rejects_invalid_otp_code(client):
+    from tests.conftest import login_as_admin
+
+    previous_auth_enabled = settings.auth_enabled
+    previous_secure_cookie = settings.auth_cookie_secure
+    previous_admin_user = settings.auth_bootstrap_admin_username
+    previous_admin_password = settings.auth_bootstrap_admin_password
+    try:
+        csrf_token = login_as_admin(client)
+        setup = client.post("/api/auth/2fa/setup", headers={"x-csrf-token": csrf_token})
+        assert setup.status_code == 200
+        payload = setup.json()
+        enable = client.post(
+            "/api/auth/2fa/enable",
+            json={
+                "enrollment_token": payload["enrollment_token"],
+                "otp_code": current_totp_code(payload["manual_entry_key"]),
+            },
+            headers={"x-csrf-token": csrf_token},
+        )
+        assert enable.status_code == 200
+        client.post("/api/auth/logout")
+
+        first_step = client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "strong-password-123"},
+        )
+        assert first_step.status_code == 200
+        challenge = first_step.json()["mfa_token"]
+
+        second_step = client.post(
+            "/api/auth/login/verify-2fa",
+            json={"mfa_token": challenge, "otp_code": "000000"},
+        )
+        assert second_step.status_code == 401
     finally:
         settings.auth_enabled = previous_auth_enabled
         settings.auth_cookie_secure = previous_secure_cookie
@@ -613,7 +710,8 @@ def test_revoke_current_session_requires_allow_current_flag(client):
         assert allowed.json()["revoked"] is True
 
         me_after = client.get("/api/auth/me")
-        assert me_after.status_code == 401
+        assert me_after.status_code == 200
+        assert me_after.json()["authenticated"] is False
     finally:
         settings.auth_enabled = previous_auth_enabled
         settings.auth_cookie_secure = previous_secure_cookie

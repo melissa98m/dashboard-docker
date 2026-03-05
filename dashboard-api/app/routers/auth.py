@@ -7,11 +7,22 @@ from app.config import settings
 from app.db.audit import write_audit_log
 from app.db.auth import (
     authenticate_credentials,
+    consume_mfa_challenge,
+    consume_mfa_enrollment,
     create_session,
+    create_mfa_challenge,
+    create_mfa_enrollment,
     create_user,
+    disable_user_totp,
+    enable_user_totp,
+    get_active_mfa_challenge,
+    get_active_mfa_enrollment,
+    get_user_identity,
+    get_user_totp_secret_encrypted,
     get_session,
     list_active_sessions,
     list_users,
+    register_mfa_challenge_attempt,
     revoke_all_sessions_for_user_id,
     revoke_all_sessions_for_username,
     revoke_session,
@@ -23,8 +34,16 @@ from app.security import (
     AuthContext,
     clear_auth_cookies,
     get_current_auth_context,
+    get_optional_auth_context,
     require_write_access,
     set_auth_cookies,
+)
+from app.security_totp import (
+    build_otpauth_uri,
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    generate_totp_secret,
+    verify_totp_code,
 )
 
 router = APIRouter()
@@ -41,6 +60,41 @@ class LoginResponse(BaseModel):
     authenticated: bool
     username: str
     role: str
+    mfa_required: bool = False
+    mfa_token: str | None = None
+    mfa_expires_at: str | None = None
+
+
+class VerifyMfaLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_token: str = Field(min_length=10, max_length=512)
+    otp_code: str = Field(min_length=6, max_length=12)
+
+
+class TotpStatusResponse(BaseModel):
+    enabled: bool
+
+
+class TotpSetupResponse(BaseModel):
+    enrollment_token: str
+    manual_entry_key: str
+    otpauth_uri: str
+    expires_at: str
+
+
+class TotpEnableRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enrollment_token: str = Field(min_length=10, max_length=512)
+    otp_code: str = Field(min_length=6, max_length=12)
+
+
+class TotpDisableRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password: str = Field(min_length=1, max_length=512)
+    otp_code: str = Field(min_length=6, max_length=12)
 
 
 class AuthMeResponse(BaseModel):
@@ -130,7 +184,7 @@ class UpdateAuthUserPasswordResponse(BaseModel):
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, response: Response):
-    """Authenticate user and create secure session cookie."""
+    """Authenticate user and create secure session cookie (or MFA challenge)."""
     if not settings.auth_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -162,10 +216,32 @@ def login(payload: LoginRequest, response: Response):
             detail="Invalid credentials",
         )
 
+    identity = get_user_identity(user_id=user_id)
+    if identity is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    if identity.totp_enabled:
+        mfa_token, expires_at = create_mfa_challenge(user_id=user_id)
+        write_audit_log(
+            action="auth_login_mfa_challenge",
+            resource_type="user",
+            resource_id=username,
+            triggered_by=username,
+            details={"expires_at": expires_at},
+        )
+        return LoginResponse(
+            authenticated=False,
+            username=identity.username,
+            role=identity.role,
+            mfa_required=True,
+            mfa_token=mfa_token,
+            mfa_expires_at=expires_at,
+        )
+
     raw_session, csrf_token = create_session(user_id=user_id)
     set_auth_cookies(response=response, session_token=raw_session, csrf_token=csrf_token)
     session = get_session(raw_session_token=raw_session)
-    role = session.role if session is not None else "viewer"
+    role = session.role if session is not None else identity.role
     write_audit_log(
         action="auth_login_success",
         resource_type="user",
@@ -173,6 +249,224 @@ def login(payload: LoginRequest, response: Response):
         triggered_by=username,
     )
     return LoginResponse(authenticated=True, username=username, role=role)
+
+
+@router.post("/login/verify-2fa", response_model=LoginResponse)
+def verify_mfa_login(payload: VerifyMfaLoginRequest, response: Response):
+    if not settings.auth_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication is disabled",
+        )
+    challenge = get_active_mfa_challenge(raw_challenge_token=payload.mfa_token)
+    if challenge is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="MFA challenge expired or invalid",
+        )
+    try:
+        secret = decrypt_totp_secret(challenge.totp_secret_encrypted)
+    except ValueError as exc:
+        if "API_SECRET_KEY" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MFA configuration is incomplete",
+            )
+        consume_mfa_challenge(raw_challenge_token=payload.mfa_token)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="MFA setup invalid")
+    if not verify_totp_code(
+        secret,
+        payload.otp_code,
+        window_steps=settings.auth_mfa_totp_window_steps,
+    ):
+        attempts = register_mfa_challenge_attempt(raw_challenge_token=payload.mfa_token)
+        write_audit_log(
+            action="auth_login_mfa_failed",
+            resource_type="user",
+            resource_id=challenge.username,
+            triggered_by="anonymous",
+            details={"attempts": str(attempts)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid one-time code",
+        )
+
+    consume_mfa_challenge(raw_challenge_token=payload.mfa_token)
+    raw_session, csrf_token = create_session(user_id=challenge.user_id)
+    set_auth_cookies(response=response, session_token=raw_session, csrf_token=csrf_token)
+    write_audit_log(
+        action="auth_login_success",
+        resource_type="user",
+        resource_id=challenge.username,
+        triggered_by=challenge.username,
+    )
+    return LoginResponse(authenticated=True, username=challenge.username, role=challenge.role)
+
+
+@router.get("/2fa/status", response_model=TotpStatusResponse)
+def get_totp_status(ctx: AuthContext = Depends(get_current_auth_context)):
+    if not ctx.session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    current_session = get_session(raw_session_token=ctx.session_token)
+    if current_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    identity = get_user_identity(user_id=current_session.user_id)
+    if identity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return TotpStatusResponse(enabled=identity.totp_enabled)
+
+
+@router.post("/2fa/setup", response_model=TotpSetupResponse)
+def setup_totp(ctx: AuthContext = Depends(get_current_auth_context)):
+    if not ctx.session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    session = get_session(raw_session_token=ctx.session_token)
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    identity = get_user_identity(user_id=session.user_id)
+    if identity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    secret = generate_totp_secret()
+    try:
+        encrypted = encrypt_totp_secret(secret)
+    except ValueError as exc:
+        if "API_SECRET_KEY" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MFA configuration is incomplete",
+            )
+        raise
+    enrollment_token, expires_at = create_mfa_enrollment(
+        user_id=identity.user_id,
+        secret_encrypted=encrypted,
+    )
+    write_audit_log(
+        action="auth_mfa_setup_started",
+        resource_type="user",
+        resource_id=identity.username,
+        triggered_by=f"user:{identity.username}",
+        details={"expires_at": expires_at},
+    )
+    return TotpSetupResponse(
+        enrollment_token=enrollment_token,
+        manual_entry_key=secret,
+        otpauth_uri=build_otpauth_uri(
+            issuer=settings.auth_mfa_issuer,
+            account_name=identity.username,
+            secret=secret,
+        ),
+        expires_at=expires_at,
+    )
+
+
+@router.post("/2fa/enable", response_model=TotpStatusResponse)
+def enable_totp(
+    payload: TotpEnableRequest,
+    ctx: AuthContext = Depends(get_current_auth_context),
+):
+    if not ctx.session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    current_session = get_session(raw_session_token=ctx.session_token)
+    if current_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    enrollment = get_active_mfa_enrollment(raw_enrollment_token=payload.enrollment_token)
+    if enrollment is None or enrollment.user_id != current_session.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="MFA enrollment expired or invalid",
+        )
+    try:
+        secret = decrypt_totp_secret(enrollment.secret_encrypted)
+    except ValueError as exc:
+        if "API_SECRET_KEY" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MFA configuration is incomplete",
+            )
+        consume_mfa_enrollment(raw_enrollment_token=payload.enrollment_token)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="MFA enrollment invalid",
+        )
+    if not verify_totp_code(
+        secret,
+        payload.otp_code,
+        window_steps=settings.auth_mfa_totp_window_steps,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid one-time code",
+        )
+
+    if not enable_user_totp(
+        user_id=enrollment.user_id,
+        secret_encrypted=enrollment.secret_encrypted,
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    consume_mfa_enrollment(raw_enrollment_token=payload.enrollment_token)
+    write_audit_log(
+        action="auth_mfa_enabled",
+        resource_type="user",
+        resource_id=enrollment.username,
+        triggered_by=f"user:{enrollment.username}",
+    )
+    return TotpStatusResponse(enabled=True)
+
+
+@router.post("/2fa/disable", response_model=TotpStatusResponse)
+def disable_totp(
+    payload: TotpDisableRequest,
+    ctx: AuthContext = Depends(get_current_auth_context),
+):
+    if not ctx.session_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    current_session = get_session(raw_session_token=ctx.session_token)
+    if current_session is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    ok, _, _, reason = authenticate_credentials(
+        username=current_session.username,
+        password=payload.password,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials" if reason != "locked" else "Account locked",
+        )
+    secret_encrypted = get_user_totp_secret_encrypted(user_id=current_session.user_id)
+    if not secret_encrypted:
+        return TotpStatusResponse(enabled=False)
+    try:
+        secret = decrypt_totp_secret(secret_encrypted)
+    except ValueError as exc:
+        if "API_SECRET_KEY" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MFA configuration is incomplete",
+            )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="MFA setup invalid")
+    if not verify_totp_code(
+        secret,
+        payload.otp_code,
+        window_steps=settings.auth_mfa_totp_window_steps,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid one-time code",
+        )
+    disable_user_totp(user_id=current_session.user_id)
+    revoke_all_sessions_for_user_id(
+        user_id=current_session.user_id,
+        exclude_raw_session_token=ctx.session_token,
+    )
+    write_audit_log(
+        action="auth_mfa_disabled",
+        resource_type="user",
+        resource_id=current_session.username,
+        triggered_by=f"user:{current_session.username}",
+    )
+    return TotpStatusResponse(enabled=False)
 
 
 @router.post("/logout")
@@ -199,7 +493,7 @@ def logout(
 
 
 @router.get("/me", response_model=AuthMeResponse)
-def me(ctx: AuthContext = Depends(get_current_auth_context)):
+def me(ctx: AuthContext = Depends(get_optional_auth_context)):
     """Return current authenticated principal."""
     if not settings.auth_enabled:
         raise HTTPException(
@@ -207,7 +501,7 @@ def me(ctx: AuthContext = Depends(get_current_auth_context)):
             detail="Authentication is disabled",
         )
     if not ctx.is_authenticated:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        return AuthMeResponse(authenticated=False, username="", role="")
     return AuthMeResponse(
         authenticated=True,
         username=ctx.username or "unknown",
@@ -311,7 +605,7 @@ def create_auth_user(
                 detail="Username already exists",
             )
         if reason in {"invalid_username", "weak_password", "invalid_role"}:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=reason)
         raise
     write_audit_log(
         action="auth_user_create",
@@ -349,7 +643,7 @@ def patch_auth_user_role(
         if reason == "last_admin":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
         if reason == "invalid_role":
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=reason)
         raise
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -387,7 +681,7 @@ def patch_auth_user_password(
     except ValueError as exc:
         reason = str(exc)
         if reason == "weak_password":
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=reason)
         raise
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

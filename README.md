@@ -45,7 +45,7 @@ make up
 | `make format-check` | Vérifie le format (CI) |
 | `make test` | Tests API + web |
 | `make test-ci` | Tests mode CI (fail-fast) |
-| `make test-e2e` | Tests E2E Playwright (nécessite `make up`) |
+| `make test-e2e` | Tests E2E Playwright via conteneur dédié (démarre API+web automatiquement) |
 | `make migrate` | Applique les migrations SQLite |
 | `make purge-audit` | Purge les logs d'audit selon la rétention |
 | `make create-user USERNAME=<nom> [ROLE=viewer]` | Crée un utilisateur (ROLE: viewer ou admin) |
@@ -94,8 +94,38 @@ Sur téléphone, ouvre l’URL du dashboard dans Chrome/Edge/Safari puis :
 
 - Socket Docker non exposé publiquement — déploiement LAN/VPN recommandé
 - Auth session obligatoire ; actions write : audit log
+- MFA TOTP disponible (QR code) : première connexion = enrôlement OTP, connexions suivantes = mot de passe + code OTP
 - Lien Restart signé (TTL court) dans les notifs : `API_SECRET_KEY` + `PUBLIC_API_URL`
 - Limite de flux SSE configurable (`SSE_MAX_CONNECTIONS`)
+
+### MFA (OTP) — usage
+
+- Première connexion d'un utilisateur sans OTP: ouverture de la configuration OTP avec QR code (et clé manuelle en fallback).
+- Connexions suivantes: étape 1 `username/password`, étape 2 `code OTP`.
+- Le QR code peut être regénéré plus tard dans `Paramètres` → `MFA utilisateur`.
+
+Pré-requis `.env`:
+
+- `API_SECRET_KEY=<secret_long_aleatoire>`
+- `AUTH_ENABLED=true`
+
+Reset OTP d'un utilisateur (ex: perte de téléphone):
+
+```bash
+docker compose exec -T dashboard-api python - <<'PY'
+import sqlite3
+conn = sqlite3.connect("/data/dashboard.db")
+conn.execute("""
+UPDATE users
+SET totp_enabled = 0, totp_secret_encrypted = NULL, totp_enabled_at = NULL
+WHERE username = ?
+""", ("melissa",))
+conn.commit()
+print("MFA reset for melissa")
+PY
+```
+
+Note: `-T` est requis avec heredoc pour éviter l'erreur `the input device is not a TTY`.
 
 ### Règles d’alerte par défaut
 

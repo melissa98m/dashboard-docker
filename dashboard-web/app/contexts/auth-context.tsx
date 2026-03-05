@@ -17,6 +17,11 @@ export interface AuthMeResponse {
   role: string;
 }
 
+interface AuthErrorDetail {
+  status?: number;
+  message?: string;
+}
+
 interface AuthContextValue {
   loading: boolean;
   authenticated: boolean;
@@ -40,10 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setApiUnavailable(false);
     try {
       const response = await apiJson<AuthMeResponse>("/api/auth/me");
-      setMe(response);
-      return response?.authenticated ?? false;
+      const isAuthenticated = response?.authenticated ?? false;
+      setMe(isAuthenticated ? response : null);
+      return isAuthenticated;
     } catch (error) {
-      if (error instanceof ApiClientError && error.status === 401) {
+      if (
+        error instanceof ApiClientError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         setMe(null);
         setApiUnavailable(false);
       } else {
@@ -70,9 +79,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshAuthState();
 
-    const onAuthError = async () => {
-      const stillAuthenticated = await refreshAuthState();
-      if (!stillAuthenticated) {
+    const onAuthError = (event: Event) => {
+      const customEvent = event as CustomEvent<AuthErrorDetail>;
+      const status = customEvent.detail?.status;
+
+      // Do not call refreshAuthState() here: it fetches /api/auth/me and would
+      // re-emit auth errors, creating an event loop on persistent 401/403.
+      if (status === 503) {
+        setApiUnavailable(true);
+      } else {
+        setMe(null);
+        setApiUnavailable(false);
+      }
+      setLoading(false);
+
+      if (status === 401 || status === 403) {
         openAuthPanelRef.current?.();
       }
     };

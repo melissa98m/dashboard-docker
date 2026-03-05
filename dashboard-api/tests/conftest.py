@@ -14,6 +14,7 @@ os.environ["ALERT_ENGINE_ENABLED"] = "false"
 os.environ["EVENT_WATCHER_ENABLED"] = "false"
 os.environ["AUDIT_RETENTION_AUTO_ENABLED"] = "false"
 os.environ["COMMAND_EXECUTION_RETENTION_AUTO_ENABLED"] = "false"
+os.environ["API_SECRET_KEY"] = "test-secret-key-123"
 
 from app.main import app
 
@@ -58,5 +59,7 @@ def reset_db(client):
         conn.execute("DELETE FROM used_stream_tokens")
         conn.execute("DELETE FROM container_env_profiles")
         conn.execute("DELETE FROM runtime_settings")
+        conn.execute("DELETE FROM auth_mfa_enrollments")
+        conn.execute("DELETE FROM auth_mfa_challenges")
         conn.execute("DELETE FROM auth_sessions")
         conn.execute("DELETE FROM users")

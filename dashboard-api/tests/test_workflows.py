@@ -1,7 +1,10 @@
 """Tests for act workflows API."""
 
+import io
+import tarfile
+
 from app.config import settings
-from app.services.act_runner import list_workflow_jobs
+from app.services.act_runner import _safe_extract_tar, list_workflow_jobs
 
 
 def test_list_workflow_jobs_parses_ci_workflow(tmp_path):
@@ -33,6 +36,38 @@ def test_list_workflow_jobs_empty_when_no_workflows(tmp_path):
     """list_workflow_jobs returns empty when .github/workflows does not exist."""
     jobs = list_workflow_jobs(str(tmp_path))
     assert jobs == []
+
+
+def _build_tar(member_name: str, content: bytes = b"ok") -> io.BytesIO:
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w") as archive:
+        member = tarfile.TarInfo(name=member_name)
+        member.size = len(content)
+        archive.addfile(member, io.BytesIO(content))
+    payload.seek(0)
+    return payload
+
+
+def test_safe_extract_tar_rejects_parent_traversal(tmp_path):
+    """_safe_extract_tar blocks tar entries escaping destination via ../."""
+    payload = _build_tar("../escape.txt")
+    with tarfile.open(fileobj=payload, mode="r") as archive:
+        try:
+            _safe_extract_tar(archive, tmp_path)
+            assert False, "Expected ValueError for parent traversal entry"
+        except ValueError as exc:
+            assert "Unsafe archive entry" in str(exc)
+
+
+def test_safe_extract_tar_rejects_absolute_path(tmp_path):
+    """_safe_extract_tar blocks absolute tar entries."""
+    payload = _build_tar("/tmp/escape.txt")
+    with tarfile.open(fileobj=payload, mode="r") as archive:
+        try:
+            _safe_extract_tar(archive, tmp_path)
+            assert False, "Expected ValueError for absolute path entry"
+        except ValueError as exc:
+            assert "Unsafe archive entry" in str(exc)
 
 
 def test_workflows_list_disabled_returns_503(client):
