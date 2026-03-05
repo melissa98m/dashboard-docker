@@ -10,6 +10,7 @@ Variables minimales recommandées:
 - `AUTH_COOKIE_SECURE=true` (prod HTTPS)
 - `AUTH_BOOTSTRAP_ADMIN_USERNAME=admin`
 - `AUTH_BOOTSTRAP_ADMIN_PASSWORD=<mot-de-passe-fort>`
+- `API_SECRET_KEY=<secret-long-aleatoire>`
 
 Bonnes pratiques:
 
@@ -28,6 +29,12 @@ Le serveur renvoie:
 - cookie session HttpOnly
 - cookie CSRF lisible côté client
 
+Si la 2FA est activée pour l’utilisateur:
+
+- la réponse login indique `mfa_required=true` et renvoie `mfa_token`
+- appeler `POST /api/auth/login/verify-2fa` avec `mfa_token` + `otp_code`
+- la session n’est créée qu’après validation OTP
+
 ### 2) Actions admin
 
 Pour les endpoints sensibles, envoyer:
@@ -42,6 +49,10 @@ Pour les endpoints sensibles, envoyer:
 ## Endpoints utiles en exploitation
 
 - `GET /api/auth/me` — identité courante
+- `GET /api/auth/2fa/status` — statut MFA de l’utilisateur courant
+- `POST /api/auth/2fa/setup` — démarre l’enrôlement TOTP (clé + URI otpauth)
+- `POST /api/auth/2fa/enable` — active la 2FA après vérification OTP
+- `POST /api/auth/2fa/disable` — désactive la 2FA (mot de passe + OTP)
 - `GET /api/auth/users?q=<search>` — recherche utilisateurs
 - `POST /api/auth/users` — création utilisateur
 - `PATCH /api/auth/users/{id}/role` — changement de rôle

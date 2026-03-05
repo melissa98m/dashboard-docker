@@ -31,7 +31,7 @@
 ## Notes
 - Any change that adds dependencies must be proposed and validated first.
 - Any docker exec feature must be allowlisted + audited.
-- Auth stricte : `AUTH_ENABLED=true` (session cookies + CSRF). Toute l’API requiert une session valide sauf `/api/auth/login` et `/health`.
+- Auth stricte : `AUTH_ENABLED=true` (session cookies + CSRF). Toute l’API requiert une session valide sauf `/api/auth/login`, `/api/auth/login/verify-2fa` et `/health`.
 - Tune `SSE_MAX_CONNECTIONS` for Raspberry Pi capacity.
 - Alert auto-evaluation runs in background (`ALERT_ENGINE_ENABLED=true`) every `ALERT_POLL_SECONDS`.
 - Event watcher (`EVENT_WATCHER_ENABLED=true`) listens to Docker container die/oom events; on detection, fetches last logs, writes audit, sends ntfy notification with restart link. Optional topic override: `EVENT_WATCHER_NTFY_TOPIC`. Status visible in `GET /api/system/security-status` (`event_watcher_enabled`, `event_watcher_running`).
