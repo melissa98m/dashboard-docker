@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch, apiJson } from "../lib/api-client";
+import { useConfirm } from "../components/confirm-dialog";
 import { useAuth } from "../contexts/auth-context";
 import { useNotifications } from "../components/notifications";
 
@@ -60,6 +61,16 @@ interface RuntimeSettings {
   audit_retention_days: number;
   audit_retention_auto_enabled: boolean;
   audit_retention_poll_seconds: number;
+}
+
+interface TotpStatusResponse {
+  enabled: boolean;
+}
+
+interface TotpSetupResponse {
+  enrollment_token: string;
+  manual_entry_key: string;
+  otpauth_uri: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -211,6 +222,7 @@ function DepCheckRow({
 
 export default function SettingsPage() {
   const notify = useNotifications();
+  const confirm = useConfirm();
   const { me } = useAuth();
   const [status, setStatus] = useState<SecurityStatus | null>(null);
   const [deps, setDeps] = useState<DependenciesHealth | null>(null);
@@ -226,6 +238,41 @@ export default function SettingsPage() {
   const [newRole, setNewRole] = useState<"viewer" | "admin">("viewer");
   const [createUserSubmitting, setCreateUserSubmitting] = useState(false);
   const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [mfaStatusLoading, setMfaStatusLoading] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [mfaSetup, setMfaSetup] = useState<TotpSetupResponse | null>(null);
+  const [mfaSetupCode, setMfaSetupCode] = useState("");
+  const [mfaQrDataUrl, setMfaQrDataUrl] = useState<string | null>(null);
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaDisablePassword, setMfaDisablePassword] = useState("");
+  const [mfaDisableCode, setMfaDisableCode] = useState("");
+
+  const mfaJson = async <T,>(
+    path: string,
+    init?: RequestInit
+  ): Promise<T> => {
+    const response = await fetch(path, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers || {}),
+      },
+    });
+    if (!response.ok) {
+      let message = "Erreur MFA";
+      try {
+        const payload = (await response.json()) as { detail?: string };
+        if (typeof payload.detail === "string" && payload.detail.trim()) {
+          message = payload.detail;
+        }
+      } catch {
+        // ignore parse errors
+      }
+      throw new Error(message);
+    }
+    return (await response.json()) as T;
+  };
 
   const syncForm = (nextValues: RuntimeSettings) => {
     setRuntimeSettings(nextValues);
@@ -249,6 +296,52 @@ export default function SettingsPage() {
     };
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!me) {
+      setMfaEnabled(null);
+      setMfaSetup(null);
+      return;
+    }
+    setMfaStatusLoading(true);
+    void (async () => {
+      try {
+        const payload = await mfaJson<TotpStatusResponse>("/api/auth/2fa/status");
+        setMfaEnabled(payload.enabled);
+      } catch (e) {
+        setMfaError(e instanceof Error ? e.message : "Erreur MFA");
+      } finally {
+        setMfaStatusLoading(false);
+      }
+    })();
+  }, [me?.username]);
+
+  useEffect(() => {
+    if (!mfaSetup?.otpauth_uri) {
+      setMfaQrDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const qrCode = await import("qrcode");
+        const toDataURL =
+          qrCode.toDataURL ?? qrCode.default?.toDataURL ?? null;
+        if (!toDataURL) throw new Error("QR encoder unavailable");
+        const dataUrl = await toDataURL(mfaSetup.otpauth_uri, {
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 220,
+        });
+        if (!cancelled) setMfaQrDataUrl(dataUrl);
+      } catch {
+        if (!cancelled) setMfaQrDataUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mfaSetup?.otpauth_uri]);
 
   const onSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -327,6 +420,78 @@ export default function SettingsPage() {
       notify.error(msg);
     } finally {
       setCreateUserSubmitting(false);
+    }
+  };
+
+  const onStartMfaSetup = async () => {
+    setMfaError(null);
+    try {
+      const setup = await mfaJson<TotpSetupResponse>("/api/auth/2fa/setup", {
+        method: "POST",
+      });
+      setMfaSetup(setup);
+      setMfaSetupCode("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur MFA";
+      setMfaError(msg);
+      notify.error(msg);
+    }
+  };
+
+  const onEnableMfa = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!mfaSetup) return;
+    setMfaError(null);
+    try {
+      await mfaJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
+        method: "POST",
+        body: JSON.stringify({
+          enrollment_token: mfaSetup.enrollment_token,
+          otp_code: mfaSetupCode.trim(),
+        }),
+      });
+      setMfaEnabled(true);
+      setMfaSetup(null);
+      setMfaSetupCode("");
+      notify.success("MFA activée");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur MFA";
+      setMfaError(msg);
+      notify.error(msg);
+    }
+  };
+
+  const onDisableMfa = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const confirmed = await confirm({
+      title: "Désactiver OTP",
+      message:
+        "La prochaine connexion ne demandera plus de code OTP. Confirme cette action sensible.",
+      tone: "danger",
+      confirmLabel: "Désactiver OTP",
+      requireText: "DESACTIVER",
+      inputLabel: "Pour confirmer, tapez",
+      inputPlaceholder: "DESACTIVER",
+      delaySeconds: 3,
+    });
+    if (!confirmed) return;
+    setMfaError(null);
+    try {
+      await mfaJson<{ enabled: boolean }>("/api/auth/2fa/disable", {
+        method: "POST",
+        body: JSON.stringify({
+          password: mfaDisablePassword.trim(),
+          otp_code: mfaDisableCode.trim(),
+        }),
+      });
+      setMfaEnabled(false);
+      setMfaDisablePassword("");
+      setMfaDisableCode("");
+      notify.success("MFA désactivée");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erreur MFA";
+      setMfaError(msg);
+      notify.error(msg);
     }
   };
 
@@ -434,6 +599,113 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="panel space-y-3">
+        <h2 className="font-semibold">MFA utilisateur</h2>
+        <p className="text-sm text-slate-400">
+          Première connexion: scanne le QR code puis active l&apos;OTP. Tu peux
+          régénérer un QR ici à tout moment.
+        </p>
+        <div className="entity-card flex items-center justify-between">
+          <span>Statut OTP</span>
+          <span className="text-sm text-slate-200">
+            {mfaStatusLoading
+              ? "chargement..."
+              : mfaEnabled === null
+                ? "inconnu"
+                : mfaEnabled
+                  ? "activé"
+                  : "non configuré"}
+          </span>
+        </div>
+        {mfaError && <p className="text-sm text-red-400">{mfaError}</p>}
+        {!mfaSetup ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => void onStartMfaSetup()}
+          >
+            {mfaEnabled ? "Regénérer QR OTP" : "Configurer OTP"}
+          </button>
+        ) : (
+          <form className="space-y-2" onSubmit={onEnableMfa}>
+            {mfaQrDataUrl ? (
+              <img
+                src={mfaQrDataUrl}
+                alt="QR code OTP à scanner"
+                className="rounded border border-slate-700 bg-white p-2"
+                width={220}
+                height={220}
+              />
+            ) : null}
+            <p className="text-xs text-slate-300">
+              Clé manuelle: <code>{mfaSetup.manual_entry_key}</code>
+            </p>
+            <a
+              href={mfaSetup.otpauth_uri}
+              className="text-xs underline text-cyan-300"
+            >
+              Ouvrir dans l&apos;app d&apos;authentification
+            </a>
+            <input
+              type="text"
+              value={mfaSetupCode}
+              onChange={(event) => setMfaSetupCode(event.target.value)}
+              placeholder="Code OTP (6 chiffres)"
+              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!mfaSetupCode.trim()}
+              >
+                Activer OTP
+              </button>
+              <button
+                type="button"
+                className="btn btn-neutral"
+                onClick={() => setMfaSetup(null)}
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
+        )}
+        {mfaEnabled && !mfaSetup && (
+          <form className="space-y-2 pt-2 border-t border-slate-700/60" onSubmit={onDisableMfa}>
+            <p className="text-xs text-slate-400">
+              Désactivation OTP (action sensible).
+            </p>
+            <input
+              type="password"
+              value={mfaDisablePassword}
+              onChange={(event) => setMfaDisablePassword(event.target.value)}
+              placeholder="Mot de passe actuel"
+              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              autoComplete="current-password"
+            />
+            <input
+              type="text"
+              value={mfaDisableCode}
+              onChange={(event) => setMfaDisableCode(event.target.value)}
+              placeholder="Code OTP actuel (6 chiffres)"
+              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+            />
+            <button
+              type="submit"
+              className="btn btn-danger"
+              disabled={!mfaDisablePassword.trim() || !mfaDisableCode.trim()}
+            >
+              Désactiver OTP
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="panel space-y-3">
