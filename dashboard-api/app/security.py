@@ -144,6 +144,37 @@ def get_current_auth_context(
     )
 
 
+def get_optional_auth_context(
+    request: Request,
+    x_csrf_token: str | None = Header(default=None, alias="x-csrf-token"),
+) -> AuthContext:
+    """Resolve current context, returning anonymous when no valid session exists."""
+    if not settings.auth_enabled:
+        return AuthContext(
+            actor="anonymous",
+            role=None,
+            username=None,
+            is_authenticated=False,
+            auth_type="none",
+            session_token=None,
+        )
+    session_ctx = _session_context(
+        request=request,
+        require_write=False,
+        x_csrf_token=x_csrf_token,
+    )
+    if session_ctx is not None:
+        return session_ctx
+    return AuthContext(
+        actor="anonymous",
+        role=None,
+        username=None,
+        is_authenticated=False,
+        auth_type="none",
+        session_token=None,
+    )
+
+
 def require_write_access(
     request: Request,
     x_csrf_token: str | None = Header(default=None, alias="x-csrf-token"),

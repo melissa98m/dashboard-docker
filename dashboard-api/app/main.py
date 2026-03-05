@@ -103,7 +103,7 @@ async def enforce_authenticated_api(request: Request, call_next):
     path = request.url.path
     if request.method == "OPTIONS":
         return await call_next(request)
-    excluded = {"/api/auth/login", "/api/containers/restart-by-token"}
+    excluded = {"/api/auth/login", "/api/auth/me", "/api/containers/restart-by-token"}
     if path.startswith("/api") and path not in excluded:
         try:
             get_current_auth_context(

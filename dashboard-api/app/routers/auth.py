@@ -23,6 +23,7 @@ from app.security import (
     AuthContext,
     clear_auth_cookies,
     get_current_auth_context,
+    get_optional_auth_context,
     require_write_access,
     set_auth_cookies,
 )
@@ -199,7 +200,7 @@ def logout(
 
 
 @router.get("/me", response_model=AuthMeResponse)
-def me(ctx: AuthContext = Depends(get_current_auth_context)):
+def me(ctx: AuthContext = Depends(get_optional_auth_context)):
     """Return current authenticated principal."""
     if not settings.auth_enabled:
         raise HTTPException(
@@ -207,7 +208,7 @@ def me(ctx: AuthContext = Depends(get_current_auth_context)):
             detail="Authentication is disabled",
         )
     if not ctx.is_authenticated:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        return AuthMeResponse(authenticated=False, username="", role="")
     return AuthMeResponse(
         authenticated=True,
         username=ctx.username or "unknown",
@@ -311,7 +312,7 @@ def create_auth_user(
                 detail="Username already exists",
             )
         if reason in {"invalid_username", "weak_password", "invalid_role"}:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=reason)
         raise
     write_audit_log(
         action="auth_user_create",
@@ -349,7 +350,7 @@ def patch_auth_user_role(
         if reason == "last_admin":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
         if reason == "invalid_role":
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=reason)
         raise
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -387,7 +388,7 @@ def patch_auth_user_password(
     except ValueError as exc:
         reason = str(exc)
         if reason == "weak_password":
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=reason)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=reason)
         raise
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

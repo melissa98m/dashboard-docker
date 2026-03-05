@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ApiClientError, apiFetch, getAuthEventName } from "../lib/api-client";
 import { useAuth } from "../contexts/auth-context";
@@ -87,6 +88,73 @@ export default function AuthAccessPanel() {
       ? `Connecté : ${me.username}`
       : "Se connecter";
 
+  const authModal = isOpen ? (
+    <>
+      <button
+        type="button"
+        className="auth-panel-backdrop"
+        onClick={() => setIsOpen(false)}
+        aria-label="Fermer le formulaire de connexion"
+      />
+      <div className="auth-panel-popover panel">
+        <p className="text-sm font-semibold mb-2">Session utilisateur</p>
+        {authError && (
+          <p className="text-xs text-red-400 mb-2">
+            Erreur {authError.status} : {authError.message}
+          </p>
+        )}
+        {me ? (
+          <>
+            <div className="mb-3 text-xs text-slate-300">
+              <p>Utilisateur : {me.username}</p>
+              <p>Rôle : {me.role}</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-neutral w-full"
+              onClick={onLogout}
+              disabled={submitting}
+            >
+              {submitting ? "Déconnexion…" : "Déconnexion"}
+            </button>
+          </>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-2">
+            <label>
+              <span className="field-label">Nom d&apos;utilisateur</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="admin"
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
+                autoComplete="username"
+              />
+            </label>
+            <label>
+              <span className="field-label">Mot de passe</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Saisir le mot de passe"
+                className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
+                autoComplete="current-password"
+              />
+            </label>
+            <button
+              type="submit"
+              className="btn btn-primary w-full"
+              disabled={submitting || !username.trim() || !password}
+            >
+              {submitting ? "Connexion…" : "Connexion"}
+            </button>
+          </form>
+        )}
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="auth-panel">
       <button
@@ -98,72 +166,9 @@ export default function AuthAccessPanel() {
         <span aria-hidden="true">AUTH</span>
         <span>{buttonLabel}</span>
       </button>
-      {isOpen && (
-        <>
-          <button
-            type="button"
-            className="auth-panel-backdrop"
-            onClick={() => setIsOpen(false)}
-            aria-label="Fermer le formulaire de connexion"
-          />
-          <div className="auth-panel-popover panel">
-          <p className="text-sm font-semibold mb-2">Session utilisateur</p>
-          {authError && (
-            <p className="text-xs text-red-400 mb-2">
-              Erreur {authError.status} : {authError.message}
-            </p>
-          )}
-          {me ? (
-            <>
-              <div className="mb-3 text-xs text-slate-300">
-                <p>Utilisateur : {me.username}</p>
-                <p>Rôle : {me.role}</p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-neutral w-full"
-                onClick={onLogout}
-                disabled={submitting}
-              >
-                {submitting ? "Déconnexion…" : "Déconnexion"}
-              </button>
-            </>
-          ) : (
-            <form onSubmit={onSubmit} className="space-y-2">
-              <label>
-                <span className="field-label">Nom d&apos;utilisateur</span>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  placeholder="admin"
-                  className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
-                  autoComplete="username"
-                />
-              </label>
-              <label>
-                <span className="field-label">Mot de passe</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Saisir le mot de passe"
-                  className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700 mb-2"
-                  autoComplete="current-password"
-                />
-              </label>
-              <button
-                type="submit"
-                className="btn btn-primary w-full"
-                disabled={submitting || !username.trim() || !password}
-              >
-                {submitting ? "Connexion…" : "Connexion"}
-              </button>
-            </form>
-          )}
-          </div>
-        </>
-      )}
+      {authModal && typeof document !== "undefined"
+        ? createPortal(authModal, document.body)
+        : null}
     </div>
   );
 }

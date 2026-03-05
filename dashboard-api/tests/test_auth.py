@@ -38,7 +38,8 @@ def test_auth_login_me_logout_flow(client):
         assert logout.status_code == 200
 
         me_after_logout = client.get("/api/auth/me")
-        assert me_after_logout.status_code == 401
+        assert me_after_logout.status_code == 200
+        assert me_after_logout.json()["authenticated"] is False
     finally:
         settings.auth_enabled = previous_auth_enabled
         settings.auth_cookie_secure = previous_secure_cookie
@@ -613,7 +614,8 @@ def test_revoke_current_session_requires_allow_current_flag(client):
         assert allowed.json()["revoked"] is True
 
         me_after = client.get("/api/auth/me")
-        assert me_after.status_code == 401
+        assert me_after.status_code == 200
+        assert me_after.json()["authenticated"] is False
     finally:
         settings.auth_enabled = previous_auth_enabled
         settings.auth_cookie_secure = previous_secure_cookie

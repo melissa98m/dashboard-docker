@@ -45,7 +45,7 @@ make up
 | `make format-check` | Vérifie le format (CI) |
 | `make test` | Tests API + web |
 | `make test-ci` | Tests mode CI (fail-fast) |
-| `make test-e2e` | Tests E2E Playwright (nécessite `make up`) |
+| `make test-e2e` | Tests E2E Playwright via conteneur dédié (démarre API+web automatiquement) |
 | `make migrate` | Applique les migrations SQLite |
 | `make purge-audit` | Purge les logs d'audit selon la rétention |
 | `make create-user USERNAME=<nom> [ROLE=viewer]` | Crée un utilisateur (ROLE: viewer ou admin) |

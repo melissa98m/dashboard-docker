@@ -61,6 +61,16 @@ def _get_docker_client():
     return docker.DockerClient(base_url=settings.docker_host)
 
 
+def _safe_extract_tar(archive: tarfile.TarFile, destination: Path) -> None:
+    """Extract tar archive while preventing path traversal outside destination."""
+    root = destination.resolve()
+    for member in archive.getmembers():
+        target = (destination / member.name).resolve()
+        if not str(target).startswith(f"{root}{os.sep}") and target != root:
+            raise ValueError(f"Unsafe archive entry detected: {member.name}")
+    archive.extractall(destination)
+
+
 def extract_workflows_from_container(container_id: str) -> str:
     """
     Copy .github/workflows from container to /tmp/act-{id}. Returns path for act.
@@ -84,7 +94,7 @@ def extract_workflows_from_container(container_id: str) -> str:
             stream, _ = container.get_archive(src)
             buf = io.BytesIO(b"".join(stream))
             with tarfile.open(fileobj=buf, mode="r") as tar:
-                tar.extractall(dest)
+                _safe_extract_tar(tar, dest)
             github_wf = dest / ".github" / "workflows"
             if github_wf.exists() and list(github_wf.glob("*.yml")):
                 return str(dest)
