@@ -29,6 +29,32 @@ class AuthSession:
     expires_at: str
 
 
+@dataclass
+class AuthUserIdentity:
+    user_id: int
+    username: str
+    role: str
+    totp_enabled: bool
+
+
+@dataclass
+class MfaChallenge:
+    user_id: int
+    username: str
+    role: str
+    totp_secret_encrypted: str
+    failed_attempts: int
+    expires_at: str
+
+
+@dataclass
+class MfaEnrollment:
+    user_id: int
+    username: str
+    secret_encrypted: str
+    expires_at: str
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -161,6 +187,38 @@ def create_user(*, username: str, password: str, role: str = "viewer") -> dict[s
         "created_at": str(row[4]),
         "updated_at": str(row[5]),
     }
+
+
+def get_user_identity(*, user_id: int) -> AuthUserIdentity | None:
+    if user_id <= 0:
+        return None
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT id, username, role, totp_enabled FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return AuthUserIdentity(
+        user_id=int(row["id"]),
+        username=str(row["username"]),
+        role=str(row["role"]),
+        totp_enabled=bool(int(row["totp_enabled"] or 0)),
+    )
+
+
+def get_user_totp_secret_encrypted(*, user_id: int) -> str | None:
+    if user_id <= 0:
+        return None
+    with sqlite3.connect(get_db_path()) as conn:
+        row = conn.execute(
+            "SELECT totp_secret_encrypted FROM users WHERE id = ? AND totp_enabled = 1",
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return str(row[0]) if row[0] else None
 
 
 def update_user_role(*, user_id: int, role: str) -> dict[str, Any] | None:
@@ -574,6 +632,191 @@ def list_users(
         conn.row_factory = sqlite3.Row
         rows = conn.execute(sql, tuple(params)).fetchall()
     return [dict(row) for row in rows]
+
+
+def create_mfa_challenge(*, user_id: int) -> tuple[str, str]:
+    raw_token = secrets.token_urlsafe(32)
+    now = _now_iso()
+    expires_at = (
+        datetime.now(UTC) + timedelta(seconds=settings.auth_mfa_challenge_ttl_seconds)
+    ).isoformat()
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.execute(
+            """
+            INSERT INTO auth_mfa_challenges (
+                user_id, challenge_hash, created_at, expires_at, failed_attempts, consumed_at
+            ) VALUES (?, ?, ?, ?, 0, NULL)
+            """,
+            (user_id, _hash_token(raw_token), now, expires_at),
+        )
+    return raw_token, expires_at
+
+
+def get_active_mfa_challenge(*, raw_challenge_token: str) -> MfaChallenge | None:
+    now = _now_iso()
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT
+                c.user_id,
+                c.failed_attempts,
+                c.expires_at,
+                u.username,
+                u.role,
+                u.totp_secret_encrypted
+            FROM auth_mfa_challenges c
+            JOIN users u ON u.id = c.user_id
+            WHERE c.challenge_hash = ?
+              AND c.consumed_at IS NULL
+              AND c.expires_at > ?
+              AND u.totp_enabled = 1
+              AND u.totp_secret_encrypted IS NOT NULL
+            """,
+            (_hash_token(raw_challenge_token), now),
+        ).fetchone()
+    if row is None:
+        return None
+    return MfaChallenge(
+        user_id=int(row["user_id"]),
+        username=str(row["username"]),
+        role=str(row["role"]),
+        totp_secret_encrypted=str(row["totp_secret_encrypted"]),
+        failed_attempts=int(row["failed_attempts"] or 0),
+        expires_at=str(row["expires_at"]),
+    )
+
+
+def register_mfa_challenge_attempt(*, raw_challenge_token: str) -> int:
+    now = _now_iso()
+    challenge_hash = _hash_token(raw_challenge_token)
+    with sqlite3.connect(get_db_path()) as conn:
+        row = conn.execute(
+            """
+            SELECT failed_attempts
+            FROM auth_mfa_challenges
+            WHERE challenge_hash = ? AND consumed_at IS NULL
+            """,
+            (challenge_hash,),
+        ).fetchone()
+        if row is None:
+            return 0
+        next_attempts = int(row[0] or 0) + 1
+        consumed_at = now if next_attempts >= settings.auth_mfa_challenge_max_attempts else None
+        conn.execute(
+            """
+            UPDATE auth_mfa_challenges
+            SET failed_attempts = ?, consumed_at = COALESCE(consumed_at, ?)
+            WHERE challenge_hash = ? AND consumed_at IS NULL
+            """,
+            (next_attempts, consumed_at, challenge_hash),
+        )
+        return next_attempts
+
+
+def consume_mfa_challenge(*, raw_challenge_token: str) -> None:
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.execute(
+            """
+            UPDATE auth_mfa_challenges
+            SET consumed_at = ?
+            WHERE challenge_hash = ? AND consumed_at IS NULL
+            """,
+            (_now_iso(), _hash_token(raw_challenge_token)),
+        )
+
+
+def create_mfa_enrollment(*, user_id: int, secret_encrypted: str) -> tuple[str, str]:
+    raw_token = secrets.token_urlsafe(32)
+    now = _now_iso()
+    expires_at = (
+        datetime.now(UTC) + timedelta(seconds=settings.auth_mfa_enrollment_ttl_seconds)
+    ).isoformat()
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.execute(
+            "UPDATE auth_mfa_enrollments SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL",
+            (now, user_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO auth_mfa_enrollments (
+                user_id, enrollment_hash, secret_encrypted, created_at, expires_at, consumed_at
+            ) VALUES (?, ?, ?, ?, ?, NULL)
+            """,
+            (user_id, _hash_token(raw_token), secret_encrypted, now, expires_at),
+        )
+    return raw_token, expires_at
+
+
+def get_active_mfa_enrollment(*, raw_enrollment_token: str) -> MfaEnrollment | None:
+    now = _now_iso()
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT e.user_id, e.secret_encrypted, e.expires_at, u.username
+            FROM auth_mfa_enrollments e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.enrollment_hash = ?
+              AND e.consumed_at IS NULL
+              AND e.expires_at > ?
+            """,
+            (_hash_token(raw_enrollment_token), now),
+        ).fetchone()
+    if row is None:
+        return None
+    return MfaEnrollment(
+        user_id=int(row["user_id"]),
+        username=str(row["username"]),
+        secret_encrypted=str(row["secret_encrypted"]),
+        expires_at=str(row["expires_at"]),
+    )
+
+
+def consume_mfa_enrollment(*, raw_enrollment_token: str) -> None:
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.execute(
+            """
+            UPDATE auth_mfa_enrollments
+            SET consumed_at = ?
+            WHERE enrollment_hash = ? AND consumed_at IS NULL
+            """,
+            (_now_iso(), _hash_token(raw_enrollment_token)),
+        )
+
+
+def enable_user_totp(*, user_id: int, secret_encrypted: str) -> bool:
+    now = _now_iso()
+    with sqlite3.connect(get_db_path()) as conn:
+        cursor = conn.execute(
+            """
+            UPDATE users
+            SET totp_enabled = 1,
+                totp_secret_encrypted = ?,
+                totp_enabled_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (secret_encrypted, now, now, user_id),
+        )
+        return int(cursor.rowcount) > 0
+
+
+def disable_user_totp(*, user_id: int) -> bool:
+    now = _now_iso()
+    with sqlite3.connect(get_db_path()) as conn:
+        cursor = conn.execute(
+            """
+            UPDATE users
+            SET totp_enabled = 0,
+                totp_secret_encrypted = NULL,
+                totp_enabled_at = NULL,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (now, user_id),
+        )
+        return int(cursor.rowcount) > 0
 
 
 def purge_expired_sessions() -> int:
