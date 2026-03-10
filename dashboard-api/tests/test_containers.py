@@ -318,6 +318,8 @@ def test_get_container_detail(client, monkeypatch):
     assert data["last_logs"][-1] == "last-10"
     assert data["last_down_reason"] is None
     assert data["finished_at"] is None
+    assert data["linked_images"][0]["display_name"] == "demo:latest"
+    assert data["mounted_volumes"] == []
 
 
 def test_get_container_detail_down_reason_and_finished_at(client, monkeypatch):
@@ -342,6 +344,59 @@ def test_get_container_detail_down_reason_and_finished_at(client, monkeypatch):
     assert data["finished_at"] == "2026-02-10T12:00:00Z"
     # OOMKilled has priority over generic error/exit code.
     assert data["last_down_reason"] == "oom_killed"
+
+
+def test_get_container_detail_returns_linked_images_and_volumes(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    fake.attrs["Mounts"] = [
+        {
+            "Type": "volume",
+            "Name": "db-data",
+            "Source": "/var/lib/docker/volumes/db-data/_data",
+            "Destination": "/var/lib/postgresql/data",
+            "RW": True,
+        },
+        {
+            "Type": "bind",
+            "Source": "/srv/config/app.yaml",
+            "Destination": "/app/config/app.yaml",
+            "RW": False,
+        },
+    ]
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["linked_images"] == [
+        {
+            "id": "sha256:abc",
+            "display_name": "demo:latest",
+            "tags": ["demo:latest"],
+        }
+    ]
+    assert data["mounted_volumes"] == [
+        {
+            "type": "bind",
+            "name": None,
+            "source": "/srv/config/app.yaml",
+            "destination": "/app/config/app.yaml",
+            "read_only": True,
+        },
+        {
+            "type": "volume",
+            "name": "db-data",
+            "source": "/var/lib/docker/volumes/db-data/_data",
+            "destination": "/var/lib/postgresql/data",
+            "read_only": False,
+        },
+    ]
 
 
 def test_get_container_detail_redacts_snapshot_sensitive_values(client, monkeypatch):
@@ -503,6 +558,66 @@ def test_stats_sse(client, monkeypatch):
     assert response.status_code == 200
     assert "event: stats" in response.text
     assert '"cpu_percent"' in response.text
+
+
+def test_stats_sse_with_interval_ms(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123/stats?max_events=1&interval_ms=250")
+    assert response.status_code == 200
+    assert "event: stats" in response.text
+
+
+def test_stats_sse_accepts_1day_interval_ms(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123/stats?max_events=1&interval_ms=60000")
+    assert response.status_code == 200
+    assert "event: stats" in response.text
+
+
+def test_stats_sse_rejects_invalid_container_id(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc$123/stats")
+    assert response.status_code == 422
+
+
+def test_stats_sse_returns_409_for_stopped_container(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    fake.attrs["State"]["Status"] = "exited"
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123/stats")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Container is not running"
 
 
 def test_logs_sse(client, monkeypatch):

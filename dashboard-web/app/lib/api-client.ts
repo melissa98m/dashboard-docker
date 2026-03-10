@@ -5,7 +5,7 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL === ""
     ? ""
-    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    : process.env.NEXT_PUBLIC_API_URL || "";
 const API_URL = API_BASE_URL;
 const API_KEY_STORAGE_KEY = "dashboard-api-key";
 const AUTH_ERROR_EVENT = "dashboard-auth-error";
@@ -152,7 +152,42 @@ export async function apiJson<T>(
 interface SseStreamOptions {
   onEvent: (eventType: string, data: unknown) => void;
   onError?: (err: Error) => void;
+  onClose?: () => void;
   signal?: AbortSignal;
+}
+
+function consumeSseBuffer(
+  input: string,
+  dispatch: (eventType: string, data: unknown) => void
+): string {
+  const chunks = input.split("\n\n");
+  const remaining = chunks.pop() ?? "";
+  for (const chunk of chunks) {
+    const lines = chunk.split("\n");
+    let eventType = "message";
+    const dataLines: string[] = [];
+    for (const rawLine of lines) {
+      const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+      if (!line || line.startsWith(":")) continue;
+      const colonIndex = line.indexOf(":");
+      const field = colonIndex >= 0 ? line.slice(0, colonIndex) : line;
+      let value = colonIndex >= 0 ? line.slice(colonIndex + 1) : "";
+      if (value.startsWith(" ")) value = value.slice(1);
+      if (field === "event") {
+        eventType = value || "message";
+      } else if (field === "data") {
+        dataLines.push(value);
+      }
+    }
+    if (dataLines.length === 0) continue;
+    const joined = dataLines.join("\n");
+    try {
+      dispatch(eventType, JSON.parse(joined) as unknown);
+    } catch {
+      dispatch(eventType, joined);
+    }
+  }
+  return remaining;
 }
 
 /**
@@ -193,24 +228,16 @@ export function streamSse(
       let buffer = "";
       while (mounted && !effectiveSignal.aborted) {
         const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        let currentEvent = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && currentEvent && mounted) {
-            try {
-              const data = JSON.parse(line.slice(6)) as unknown;
-              onEvent(currentEvent, data);
-            } catch {
-              /* ignore parse errors */
-            }
-            currentEvent = "";
+        if (done) {
+          if (mounted && !effectiveSignal.aborted) {
+            options.onClose?.();
           }
+          break;
         }
+        buffer += decoder.decode(value, { stream: true });
+        buffer = consumeSseBuffer(buffer, (eventType, data) => {
+          if (mounted) onEvent(eventType, data);
+        });
       }
     } catch (err) {
       if (mounted && err instanceof Error && err.name !== "AbortError") {
@@ -268,24 +295,16 @@ export function streamSsePost(
       let buffer = "";
       while (mounted && !effectiveSignal.aborted) {
         const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        let currentEvent = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && currentEvent && mounted) {
-            try {
-              const data = JSON.parse(line.slice(6)) as unknown;
-              onEvent(currentEvent, data);
-            } catch {
-              /* ignore parse errors */
-            }
-            currentEvent = "";
+        if (done) {
+          if (mounted && !effectiveSignal.aborted) {
+            options.onClose?.();
           }
+          break;
         }
+        buffer += decoder.decode(value, { stream: true });
+        buffer = consumeSseBuffer(buffer, (eventType, data) => {
+          if (mounted) onEvent(eventType, data);
+        });
       }
     } catch (err) {
       if (mounted && err instanceof Error && err.name !== "AbortError") {

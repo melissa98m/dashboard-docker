@@ -46,6 +46,18 @@ describe("api-client", () => {
     expect(headers.get("x-api-key")).toBe("abc-key");
   });
 
+  it("uses same-origin API routes by default", async () => {
+    const fetchMock = vi.fn(async () => buildJsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/containers");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/containers",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+
   it("emits auth event and throws ApiClientError on unauthorized response", async () => {
     const listener = vi.fn();
     window.addEventListener(getAuthEventName(), listener as EventListener);

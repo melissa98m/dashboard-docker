@@ -50,30 +50,6 @@ export default function AuthAccessPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<AuthErrorDetail | null>(null);
 
-  const mfaJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(path, {
-      ...init,
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers || {}),
-      },
-    });
-    if (!response.ok) {
-      let message = "Erreur MFA";
-      try {
-        const payload = (await response.json()) as { detail?: string };
-        if (typeof payload.detail === "string" && payload.detail.trim()) {
-          message = payload.detail;
-        }
-      } catch {
-        // ignore parse errors
-      }
-      throw new ApiClientError(message, response.status);
-    }
-    return (await response.json()) as T;
-  };
-
   useEffect(() => {
     return registerOpenAuthPanel(() => setIsOpen(true));
   }, [registerOpenAuthPanel]);
@@ -108,7 +84,7 @@ export default function AuthAccessPanel() {
     }
     void (async () => {
       try {
-        const payload = await mfaJson<TotpStatusResponse>(
+        const payload = await apiJson<TotpStatusResponse>(
           "/api/auth/2fa/status"
         );
         setTotpEnabled(payload.enabled);
@@ -167,7 +143,7 @@ export default function AuthAccessPanel() {
       setOtpCode("");
       setAuthError(null);
       await refreshAuthState();
-      const statusPayload = await mfaJson<TotpStatusResponse>(
+      const statusPayload = await apiJson<TotpStatusResponse>(
         "/api/auth/2fa/status"
       );
       setTotpEnabled(statusPayload.enabled);
@@ -224,7 +200,7 @@ export default function AuthAccessPanel() {
     setSubmitting(true);
     setAuthError(null);
     try {
-      const setup = await mfaJson<TotpSetupResponse>("/api/auth/2fa/setup", {
+      const setup = await apiJson<TotpSetupResponse>("/api/auth/2fa/setup", {
         method: "POST",
       });
       setTotpSetup(setup);
@@ -245,7 +221,7 @@ export default function AuthAccessPanel() {
     setSubmitting(true);
     setAuthError(null);
     try {
-      await mfaJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
+      await apiJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
         method: "POST",
         body: JSON.stringify({
           enrollment_token: totpSetup.enrollment_token,

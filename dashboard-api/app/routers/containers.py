@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import threading
 import time
 from collections import deque
@@ -30,6 +31,7 @@ _SSE_SEMAPHORE = threading.BoundedSemaphore(value=settings.sse_max_connections)
 _TOKEN_RATE_LIMIT_LOCK = threading.Lock()
 _TOKEN_RATE_LIMIT_ATTEMPTS: dict[str, deque[float]] = {}
 logger = logging.getLogger(__name__)
+_CONTAINER_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
 def _get_client() -> docker.DockerClient:
@@ -40,6 +42,13 @@ def _safe_container_name(raw_name: str) -> str:
     if raw_name.startswith("/"):
         return raw_name[1:]
     return raw_name
+
+
+def _validate_container_id(container_id: str) -> str:
+    candidate = container_id.strip()
+    if not _CONTAINER_ID_PATTERN.fullmatch(candidate):
+        raise HTTPException(status_code=422, detail="Invalid container ID format")
+    return candidate
 
 
 def _container_image_ref(container: Any) -> str:
@@ -109,15 +118,24 @@ def _last_down_reason(state: dict[str, Any]) -> str | None:
 
 
 def _compute_stats_payload(raw: dict[str, Any]) -> dict[str, float]:
+    def _to_float(value: Any) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        if parsed != parsed:  # NaN guard
+            return 0.0
+        return parsed
+
     cpu_stats = raw.get("cpu_stats", {})
     precpu = raw.get("precpu_stats", {})
     cpu_usage = cpu_stats.get("cpu_usage", {})
     pre_cpu_usage = precpu.get("cpu_usage", {})
 
-    cpu_total = float(cpu_usage.get("total_usage", 0))
-    pre_cpu_total = float(pre_cpu_usage.get("total_usage", 0))
-    system_total = float(cpu_stats.get("system_cpu_usage", 0))
-    pre_system_total = float(precpu.get("system_cpu_usage", 0))
+    cpu_total = _to_float(cpu_usage.get("total_usage", 0))
+    pre_cpu_total = _to_float(pre_cpu_usage.get("total_usage", 0))
+    system_total = _to_float(cpu_stats.get("system_cpu_usage", 0))
+    pre_system_total = _to_float(precpu.get("system_cpu_usage", 0))
     cpu_delta = cpu_total - pre_cpu_total
     system_delta = system_total - pre_system_total
     online_cpus = cpu_stats.get("online_cpus")
@@ -134,9 +152,10 @@ def _compute_stats_payload(raw: dict[str, Any]) -> dict[str, float]:
         cpu_percent = (cpu_delta / system_delta) * cpu_count * 100.0
 
     memory = raw.get("memory_stats", {})
-    memory_usage = float(memory.get("usage", 0))
-    memory_limit = float(memory.get("limit", 0))
+    memory_usage = max(_to_float(memory.get("usage", 0)), 0.0)
+    memory_limit = max(_to_float(memory.get("limit", 0)), 0.0)
     memory_percent = (memory_usage / memory_limit * 100.0) if memory_limit > 0 else 0.0
+    memory_percent = min(max(memory_percent, 0.0), 100.0)
     memory_mb = memory_usage / (1024 * 1024)
 
     return {
@@ -165,6 +184,20 @@ class ContainerActionResponse(BaseModel):
     message: str
 
 
+class LinkedImage(BaseModel):
+    id: str
+    display_name: str
+    tags: list[str]
+
+
+class MountedVolume(BaseModel):
+    type: str
+    name: str | None
+    source: str | None
+    destination: str
+    read_only: bool | None
+
+
 class ContainerDetail(BaseModel):
     id: str
     name: str
@@ -177,10 +210,69 @@ class ContainerDetail(BaseModel):
     health_status: str | None
     last_down_reason: str | None
     last_logs: list[str]
+    linked_images: list[LinkedImage]
+    mounted_volumes: list[MountedVolume]
 
 
 class TokenRestartRequest(BaseModel):
     token: str
+
+
+def _linked_images(container: Any) -> list[LinkedImage]:
+    """Return normalized image metadata for the current container."""
+    tags: list[str] = []
+    image_id = ""
+    display_name = _container_image_ref(container)
+    try:
+        raw_tags = getattr(container.image, "tags", None) or []
+        tags = [str(tag) for tag in raw_tags if isinstance(tag, str) and tag.strip()][:20]
+        short_id = getattr(container.image, "short_id", "")
+        if isinstance(short_id, str) and short_id.strip():
+            image_id = short_id
+    except docker.errors.DockerException:
+        pass
+    if not image_id:
+        attrs = getattr(container, "attrs", {}) or {}
+        raw_image_id = attrs.get("Image")
+        if isinstance(raw_image_id, str) and raw_image_id.strip():
+            image_id = raw_image_id[:24]
+    if not image_id:
+        image_id = display_name
+    return [LinkedImage(id=image_id, display_name=display_name, tags=tags)]
+
+
+def _mounted_volumes(attrs: dict[str, Any]) -> list[MountedVolume]:
+    """Extract container mounts without extra Docker API calls."""
+    mounts = attrs.get("Mounts")
+    if not isinstance(mounts, list):
+        return []
+    items: list[MountedVolume] = []
+    seen: set[tuple[str, str, str]] = set()
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            continue
+        mount_type = str(mount.get("Type") or "unknown")
+        destination = str(mount.get("Destination") or "").strip()
+        if not destination:
+            continue
+        name = str(mount.get("Name") or "").strip()
+        source = str(mount.get("Source") or "").strip()
+        unique_key = (mount_type, name or source, destination)
+        if unique_key in seen:
+            continue
+        seen.add(unique_key)
+        rw = mount.get("RW")
+        items.append(
+            MountedVolume(
+                type=mount_type,
+                name=name or None,
+                source=source or None,
+                destination=destination,
+                read_only=(not rw) if isinstance(rw, bool) else None,
+            )
+        )
+    items.sort(key=lambda item: item.destination)
+    return items
 
 
 class ContainerCommandSpecItem(BaseModel):
@@ -465,6 +557,7 @@ def list_container_command_specs(
     container_id: str,
     _actor: str = Depends(require_read_access),
 ):
+    container_id = _validate_container_id(container_id)
     return [ContainerCommandSpecItem(**row) for row in list_specs(container_id=container_id)]
 
 
@@ -478,6 +571,7 @@ def list_container_discovered_commands(
     offset: int = Query(default=0, ge=0),
     _actor: str = Depends(require_read_access),
 ):
+    container_id = _validate_container_id(container_id)
     rows = list_discovered_commands(container_id=container_id, limit=limit, offset=offset)
     return [ContainerDiscoveredCommandItem(**row) for row in rows]
 
@@ -488,6 +582,7 @@ def list_container_executions(
     limit: int = Query(default=100, ge=1, le=500),
     _actor: str = Depends(require_read_access),
 ):
+    container_id = _validate_container_id(container_id)
     rows = list_executions(limit=limit, container_id=container_id)
     return [ContainerExecutionItem(**row) for row in rows]
 
@@ -499,6 +594,7 @@ def get_container_detail(
     _actor: str = Depends(require_read_access),
 ):
     """Get container details, including last logs and failure hints."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         container = client.containers.get(container_id)
@@ -520,6 +616,8 @@ def get_container_detail(
             health_status=health.get("Status"),
             last_down_reason=_last_down_reason(state),
             last_logs=logs,
+            linked_images=_linked_images(container),
+            mounted_volumes=_mounted_volumes(attrs),
         )
     except docker.errors.NotFound:
         raise HTTPException(status_code=404, detail="Container not found")
@@ -531,12 +629,18 @@ def get_container_detail(
 def stream_container_stats(
     container_id: str,
     max_events: int = Query(default=0, ge=0, le=500),
+    interval_ms: int = Query(default=1000, ge=250, le=60000),
     _actor: str = Depends(require_read_access),
 ):
     """Stream live container stats as SSE events."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         container = client.containers.get(container_id)
+        state = container.attrs.get("State", {}) if isinstance(container.attrs, dict) else {}
+        status = state.get("Status", "unknown")
+        if status != "running":
+            raise HTTPException(status_code=409, detail="Container is not running")
     except docker.errors.NotFound:
         raise HTTPException(status_code=404, detail="Container not found")
     except docker.errors.DockerException:
@@ -547,12 +651,22 @@ def stream_container_stats(
 
     def event_stream() -> Iterator[str]:
         sent = 0
+        last_sent_at = 0.0
+        last_heartbeat_at = time.monotonic()
+        heartbeat_interval_sec = 15.0
         try:
             for raw in container.stats(stream=True, decode=True):
                 if not isinstance(raw, dict):
                     continue
+                now = time.monotonic()
+                if (now - last_heartbeat_at) >= heartbeat_interval_sec:
+                    yield _sse_event("ping", {"ts": int(time.time())})
+                    last_heartbeat_at = now
+                if last_sent_at > 0 and ((now - last_sent_at) * 1000.0) < interval_ms:
+                    continue
                 payload = _compute_stats_payload(raw)
                 yield _sse_event("stats", payload)
+                last_sent_at = now
                 sent += 1
                 if max_events > 0 and sent >= max_events:
                     break
@@ -561,7 +675,15 @@ def stream_container_stats(
         finally:
             _SSE_SEMAPHORE.release()
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/{container_id}/logs")
@@ -572,6 +694,7 @@ def stream_container_logs(
     _actor: str = Depends(require_read_access),
 ):
     """Stream container logs as SSE events."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         container = client.containers.get(container_id)
@@ -598,7 +721,15 @@ def stream_container_logs(
         finally:
             _SSE_SEMAPHORE.release()
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/{container_id}/start", response_model=ContainerActionResponse)
@@ -607,6 +738,7 @@ def start_container(
     actor: str = Depends(require_write_access),
 ):
     """Start a container."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         c = client.containers.get(container_id)
@@ -644,6 +776,7 @@ def stop_container(
     actor: str = Depends(require_write_access),
 ):
     """Stop a container."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         c = client.containers.get(container_id)
@@ -681,6 +814,7 @@ def restart_container(
     actor: str = Depends(require_write_access),
 ):
     """Restart a container."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         c = client.containers.get(container_id)
@@ -720,6 +854,7 @@ def delete_container(
     actor: str = Depends(require_write_access),
 ):
     """Delete a container."""
+    container_id = _validate_container_id(container_id)
     try:
         client = _get_client()
         c = client.containers.get(container_id)

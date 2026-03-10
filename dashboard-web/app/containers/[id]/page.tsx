@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { apiJson, streamSse } from "../../lib/api-client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ApiClientError, apiJson, streamSse } from "../../lib/api-client";
 import {
   STATS_RANGE_OPTIONS,
   StatsCharts,
@@ -22,6 +22,22 @@ interface ContainerDetail {
   health_status: string | null;
   last_down_reason: string | null;
   last_logs: string[];
+  linked_images: LinkedImage[];
+  mounted_volumes: MountedVolume[];
+}
+
+interface LinkedImage {
+  id: string;
+  display_name: string;
+  tags: string[];
+}
+
+interface MountedVolume {
+  type: string;
+  name: string | null;
+  source: string | null;
+  destination: string;
+  read_only: boolean | null;
 }
 
 interface StatsPayload {
@@ -29,12 +45,26 @@ interface StatsPayload {
   memory_mb: number;
   memory_percent: number;
 }
+type StatsStreamStatus =
+  | "idle"
+  | "connecting"
+  | "live"
+  | "reconnecting"
+  | "error";
 
 function formatUptime(seconds: number | null): string {
   if (seconds == null) return "—";
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   return `${Math.floor(seconds / 3600)}h`;
+}
+
+function formatStreamStatus(status: StatsStreamStatus): string {
+  if (status === "live") return "en direct";
+  if (status === "connecting") return "connexion…";
+  if (status === "reconnecting") return "reconnexion…";
+  if (status === "error") return "erreur";
+  return "inactif";
 }
 
 export default function ContainerDetailPage({
@@ -52,10 +82,13 @@ export default function ContainerDetailPage({
   const [statsRange, setStatsRange] = useState<StatsRangeId>("2m");
   const [error, setError] = useState<string | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [statsStreamStatus, setStatsStreamStatus] =
+    useState<StatsStreamStatus>("idle");
   const containerId = useMemo(() => params.id, [params.id]);
-  const lastSampleTsRef = useRef<number>(0);
-  const statsRangeRef = useRef(statsRange);
-  statsRangeRef.current = statsRange;
+  const statsRangeConfig = useMemo(
+    () => STATS_RANGE_OPTIONS.find((o) => o.id === statsRange) ?? STATS_RANGE_OPTIONS[0],
+    [statsRange]
+  );
 
   const loadDetail = useCallback(async () => {
     setError(null);
@@ -74,24 +107,71 @@ export default function ContainerDetailPage({
   }, [loadDetail]);
 
   useEffect(() => {
-    setStatsError(null);
     setStatsHistory([]);
-    lastSampleTsRef.current = 0;
-    const stop = streamSse(
-      `/api/containers/${encodeURIComponent(containerId)}/stats`,
-      {
-        onEvent: (eventType, data) => {
-          if (eventType === "stats") {
-            const payload = data as StatsPayload;
-            setStats(payload);
-            const rangeConfig =
-              STATS_RANGE_OPTIONS.find((o) => o.id === statsRangeRef.current) ??
-              STATS_RANGE_OPTIONS[0];
-            const now = Date.now();
-            const elapsedMs = now - lastSampleTsRef.current;
-            const intervalMs = rangeConfig.intervalSec * 1000;
-            if (lastSampleTsRef.current === 0 || elapsedMs >= intervalMs) {
-              lastSampleTsRef.current = now;
+    setStats({
+      cpu_percent: 0,
+      memory_mb: 0,
+      memory_percent: 0,
+    });
+  }, [containerId]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void loadDetail();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [loadDetail]);
+
+  useEffect(() => {
+    setStatsError(null);
+    if (detail?.status !== "running") {
+      setStatsStreamStatus("idle");
+      return;
+    }
+    setStatsStreamStatus("connecting");
+
+    let stopped = false;
+    let stopStream: (() => void) | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReconnect = (attempt: number) => {
+      if (retryTimer) clearTimeout(retryTimer);
+      const retryMs = Math.min(30000, 1000 * 2 ** Math.min(attempt, 5));
+      setStatsStreamStatus("reconnecting");
+      retryTimer = setTimeout(() => connect(attempt + 1), retryMs);
+    };
+
+    const connect = (attempt: number) => {
+      if (stopped) return;
+      setStatsStreamStatus(attempt === 0 ? "connecting" : "reconnecting");
+
+      const query = new URLSearchParams({
+        interval_ms: String(statsRangeConfig.intervalSec * 1000),
+      });
+      stopStream = streamSse(
+        `/api/containers/${encodeURIComponent(containerId)}/stats?${query.toString()}`,
+        {
+          onEvent: (eventType, data) => {
+            if (eventType === "stats") {
+              const raw = data as Partial<StatsPayload> | null;
+              const cpu = Number(raw?.cpu_percent);
+              const memoryMb = Number(raw?.memory_mb);
+              const memoryPercent = Number(raw?.memory_percent);
+              if (
+                !Number.isFinite(cpu) ||
+                !Number.isFinite(memoryMb) ||
+                !Number.isFinite(memoryPercent)
+              ) {
+                return;
+              }
+              const payload: StatsPayload = {
+                cpu_percent: Math.max(0, cpu),
+                memory_mb: Math.max(0, memoryMb),
+                memory_percent: Math.max(0, Math.min(100, memoryPercent)),
+              };
+              setStats(payload);
+              setStatsError(null);
+              setStatsStreamStatus("live");
+              const now = Date.now();
               setStatsHistory((prev) => {
                 const point: StatsDataPoint = {
                   ts: now,
@@ -100,18 +180,50 @@ export default function ContainerDetailPage({
                   memory_percent: payload.memory_percent,
                 };
                 const next = [...prev, point];
-                return next.length > rangeConfig.maxPoints
-                  ? next.slice(-rangeConfig.maxPoints)
+                return next.length > statsRangeConfig.maxPoints
+                  ? next.slice(-statsRangeConfig.maxPoints)
                   : next;
               });
             }
-          }
-        },
-        onError: (err) => setStatsError(err.message),
-      }
-    );
-    return stop;
-  }, [containerId]);
+            if (eventType === "error") {
+              setStatsError("Flux stats interrompu côté serveur.");
+            }
+          },
+          onError: (err) => {
+            if (stopped) return;
+            setStatsError(err.message);
+            if (err instanceof ApiClientError && err.status === 409) {
+              setStatsError("Conteneur arrêté, stats live en pause.");
+              setStatsStreamStatus("idle");
+              void loadDetail();
+              return;
+            }
+            const isRetriable =
+              !(err instanceof ApiClientError) ||
+              err.status === 429 ||
+              err.status >= 500;
+            if (!isRetriable) {
+              setStatsStreamStatus("error");
+              return;
+            }
+            scheduleReconnect(attempt);
+          },
+          onClose: () => {
+            if (stopped) return;
+            scheduleReconnect(attempt);
+          },
+        }
+      );
+    };
+
+    connect(0);
+    return () => {
+      stopped = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      stopStream?.();
+      setStatsStreamStatus("idle");
+    };
+  }, [containerId, detail?.status, loadDetail, statsRangeConfig]);
 
   if (error) {
     return (
@@ -194,7 +306,70 @@ export default function ContainerDetailPage({
       </section>
 
       <section className="panel">
+        <h2 className="font-semibold mb-2">Ressources liées</h2>
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm text-slate-300">Images</p>
+            {detail.linked_images.length === 0 ? (
+              <p className="text-xs text-slate-500 mt-1">Aucune image liée.</p>
+            ) : (
+              <ul className="mt-1 space-y-1 text-sm">
+                {detail.linked_images.map((img) => (
+                  <li key={img.id}>
+                    <Link
+                      href={`/images/${encodeURIComponent(img.id)}`}
+                      className="text-sky-400 hover:underline"
+                    >
+                      {img.display_name}
+                    </Link>
+                    {img.tags.length > 0 && (
+                      <span className="text-xs text-slate-500 ml-2">
+                        ({img.tags.length} tag{img.tags.length > 1 ? "s" : ""})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-slate-300">Volumes / montages</p>
+            {detail.mounted_volumes.length === 0 ? (
+              <p className="text-xs text-slate-500 mt-1">Aucun montage.</p>
+            ) : (
+              <ul className="mt-1 space-y-1 text-sm">
+                {detail.mounted_volumes.map((mount) => {
+                  const key = `${mount.type}-${mount.destination}-${mount.source ?? mount.name ?? "none"}`;
+                  return (
+                    <li key={key}>
+                      {mount.type === "volume" && mount.name ? (
+                        <Link
+                          href={`/volumes/${encodeURIComponent(mount.name)}`}
+                          className="text-sky-400 hover:underline"
+                        >
+                          {mount.name}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-300">{mount.source ?? "mount"}</span>
+                      )}
+                      <span className="text-slate-500"> → {mount.destination}</span>
+                      {mount.read_only === true && (
+                        <span className="text-xs text-amber-300 ml-2">(read-only)</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
         <h2 className="font-semibold mb-2">Stats live</h2>
+        <p className="text-xs text-slate-500 mb-2" aria-live="polite">
+          Stream: {formatStreamStatus(statsStreamStatus)}
+        </p>
         {statsError ? (
           <p className="text-amber-400 text-sm">{statsError}</p>
         ) : (
