@@ -247,30 +247,6 @@ export default function SettingsPage() {
   const [mfaDisablePassword, setMfaDisablePassword] = useState("");
   const [mfaDisableCode, setMfaDisableCode] = useState("");
 
-  const mfaJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(path, {
-      ...init,
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers || {}),
-      },
-    });
-    if (!response.ok) {
-      let message = "Erreur MFA";
-      try {
-        const payload = (await response.json()) as { detail?: string };
-        if (typeof payload.detail === "string" && payload.detail.trim()) {
-          message = payload.detail;
-        }
-      } catch {
-        // ignore parse errors
-      }
-      throw new Error(message);
-    }
-    return (await response.json()) as T;
-  };
-
   const syncForm = (nextValues: RuntimeSettings) => {
     setRuntimeSettings(nextValues);
     setForm(nextValues);
@@ -303,7 +279,7 @@ export default function SettingsPage() {
     setMfaStatusLoading(true);
     void (async () => {
       try {
-        const payload = await mfaJson<TotpStatusResponse>(
+        const payload = await apiJson<TotpStatusResponse>(
           "/api/auth/2fa/status"
         );
         setMfaEnabled(payload.enabled);
@@ -424,7 +400,7 @@ export default function SettingsPage() {
   const onStartMfaSetup = async () => {
     setMfaError(null);
     try {
-      const setup = await mfaJson<TotpSetupResponse>("/api/auth/2fa/setup", {
+      const setup = await apiJson<TotpSetupResponse>("/api/auth/2fa/setup", {
         method: "POST",
       });
       setMfaSetup(setup);
@@ -441,7 +417,7 @@ export default function SettingsPage() {
     if (!mfaSetup) return;
     setMfaError(null);
     try {
-      await mfaJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
+      await apiJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
         method: "POST",
         body: JSON.stringify({
           enrollment_token: mfaSetup.enrollment_token,
@@ -475,7 +451,7 @@ export default function SettingsPage() {
     if (!confirmed) return;
     setMfaError(null);
     try {
-      await mfaJson<{ enabled: boolean }>("/api/auth/2fa/disable", {
+      await apiJson<{ enabled: boolean }>("/api/auth/2fa/disable", {
         method: "POST",
         body: JSON.stringify({
           password: mfaDisablePassword.trim(),
