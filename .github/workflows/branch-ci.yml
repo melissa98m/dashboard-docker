@@ -1,0 +1,38 @@
+name: Branch CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: branch-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, format, build & tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create minimal .env
+        run: |
+          cp .env.example .env 2>/dev/null || touch .env
+          echo "DATABASE_URL=sqlite:////tmp/dashboard.db" >> .env
+          echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env
+
+      - name: Build Docker images
+        run: make build
+
+      - name: Lint API + Web
+        run: make lint-ci
+
+      - name: Format check
+        run: make format-check
+
+      - name: Run tests
+        run: make test-ci

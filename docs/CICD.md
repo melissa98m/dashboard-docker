@@ -2,19 +2,21 @@
 
 ## Vue d'ensemble
 
-- **CI + Deploy** : lint, tests, build puis déploiement sur le Raspberry Pi (push sur `main`)
+- **Branch CI** : lint, format, build et tests à chaque push sur n'importe quelle branche et à chaque PR, sans déploiement
+- **CI + Deploy** : lint, tests, build puis déploiement sur le Raspberry Pi sur `main`, avec déclenchement manuel possible
 - **Auto Pull Request** : crée/met à jour une PR à chaque push vers une branche hors `main`
 
 ## Workflows
 
 | Workflow         | Fichier                            | Déclencheur                     |
 |------------------|-------------------------------------|---------------------------------|
-| CI + Deploy      | `.github/workflows/ci.yml`          | Push + PR sur `main` ; deploy uniquement sur push `main` |
+| Branch CI        | `.github/workflows/branch-ci.yml`   | Push sur toutes les branches + PR ; aucun déploiement |
+| CI + Deploy      | `.github/workflows/ci.yml`          | Push sur `main` + déclenchement manuel ; deploy sur push `main` ou lancement manuel |
 | Auto Pull Request| `.github/workflows/auto-pull-request.yml` | Push branches hors `main`/`master` |
 
 ## CI
 
-Exécute séquentiellement :
+Le workflow `Branch CI` exécute à chaque `push` sur n'importe quelle branche et à chaque `pull_request` :
 - **Lint** : `make lint-ci` (ruff, mypy, ESLint)
 - **Format** : `make format-check`
 - **Tests** : `make test-ci` (pytest + Vitest)
