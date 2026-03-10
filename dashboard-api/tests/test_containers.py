@@ -560,6 +560,66 @@ def test_stats_sse(client, monkeypatch):
     assert '"cpu_percent"' in response.text
 
 
+def test_stats_sse_with_interval_ms(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123/stats?max_events=1&interval_ms=250")
+    assert response.status_code == 200
+    assert "event: stats" in response.text
+
+
+def test_stats_sse_accepts_1day_interval_ms(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123/stats?max_events=1&interval_ms=60000")
+    assert response.status_code == 200
+    assert "event: stats" in response.text
+
+
+def test_stats_sse_rejects_invalid_container_id(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc$123/stats")
+    assert response.status_code == 422
+
+
+def test_stats_sse_returns_409_for_stopped_container(client, monkeypatch):
+    from app.routers import containers as containers_router
+
+    login_as_admin(client)
+    fake = FakeContainer()
+    fake.attrs["State"]["Status"] = "exited"
+    monkeypatch.setattr(
+        containers_router,
+        "_get_client",
+        lambda: FakeDockerClient(fake),
+    )
+    response = client.get("/api/containers/abc123/stats")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Container is not running"
+
+
 def test_logs_sse(client, monkeypatch):
     from app.routers import containers as containers_router
 
