@@ -86,7 +86,9 @@ export default function ContainerDetailPage({
     useState<StatsStreamStatus>("idle");
   const containerId = useMemo(() => params.id, [params.id]);
   const statsRangeConfig = useMemo(
-    () => STATS_RANGE_OPTIONS.find((o) => o.id === statsRange) ?? STATS_RANGE_OPTIONS[0],
+    () =>
+      STATS_RANGE_OPTIONS.find((o) => o.id === statsRange) ??
+      STATS_RANGE_OPTIONS[0],
     [statsRange]
   );
 
@@ -350,11 +352,18 @@ export default function ContainerDetailPage({
                           {mount.name}
                         </Link>
                       ) : (
-                        <span className="text-slate-300">{mount.source ?? "mount"}</span>
+                        <span className="text-slate-300">
+                          {mount.source ?? "mount"}
+                        </span>
                       )}
-                      <span className="text-slate-500"> → {mount.destination}</span>
+                      <span className="text-slate-500">
+                        {" "}
+                        → {mount.destination}
+                      </span>
                       {mount.read_only === true && (
-                        <span className="text-xs text-amber-300 ml-2">(read-only)</span>
+                        <span className="text-xs text-amber-300 ml-2">
+                          (read-only)
+                        </span>
                       )}
                     </li>
                   );
