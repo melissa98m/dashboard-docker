@@ -27,6 +27,11 @@ function buildJsonResponse(
 describe("api-client", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    (
+      window as Window & {
+        __DASHBOARD_RUNTIME_CONFIG__?: { authCsrfCookieName?: string };
+      }
+    ).__DASHBOARD_RUNTIME_CONFIG__ = undefined;
   });
 
   afterEach(() => {
@@ -56,6 +61,27 @@ describe("api-client", () => {
       "/api/containers",
       expect.objectContaining({ credentials: "include" })
     );
+  });
+
+  it("injects csrf header from runtime-configured cookie name", async () => {
+    (
+      window as Window & {
+        __DASHBOARD_RUNTIME_CONFIG__?: { authCsrfCookieName?: string };
+      }
+    ).__DASHBOARD_RUNTIME_CONFIG__ = {
+      authCsrfCookieName: "dashboard_csrf_instance_b",
+    };
+    document.cookie = "dashboard_csrf_instance_b=csrf-token-b";
+    const fetchMock = vi.fn(async () => buildJsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/containers/bulk/start", { method: "POST" });
+
+    const options = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(options.headers);
+    expect(headers.get("x-csrf-token")).toBe("csrf-token-b");
+    document.cookie =
+      "dashboard_csrf_instance_b=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
   });
 
   it("emits auth event and throws ApiClientError on unauthorized response", async () => {

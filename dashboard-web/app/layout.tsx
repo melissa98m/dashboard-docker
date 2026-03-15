@@ -27,6 +27,14 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+function buildRuntimeConfigScript(): string {
+  const payload = {
+    authCsrfCookieName:
+      process.env.AUTH_CSRF_COOKIE_NAME?.trim() || "dashboard_csrf",
+  };
+  return `window.__DASHBOARD_RUNTIME_CONFIG__=${JSON.stringify(payload).replace(/</g, "\\u003c")};`;
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: buildRuntimeConfigScript() }} />
         <NotificationsProvider>
           <ConfirmDialogProvider>
             <AuthProvider>
