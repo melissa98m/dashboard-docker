@@ -43,7 +43,9 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <script dangerouslySetInnerHTML={{ __html: buildRuntimeConfigScript() }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: buildRuntimeConfigScript() }}
+        />
         <NotificationsProvider>
           <ConfirmDialogProvider>
             <AuthProvider>
