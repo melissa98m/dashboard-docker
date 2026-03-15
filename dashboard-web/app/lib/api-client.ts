@@ -10,8 +10,10 @@ const API_URL = API_BASE_URL;
 const API_KEY_STORAGE_KEY = "dashboard-api-key";
 const AUTH_ERROR_EVENT = "dashboard-auth-error";
 const AUTH_KEY_UPDATED_EVENT = "dashboard-auth-key-updated";
-const AUTH_CSRF_COOKIE_NAME =
-  process.env.NEXT_PUBLIC_AUTH_CSRF_COOKIE_NAME || "dashboard_csrf";
+
+interface DashboardRuntimeConfig {
+  authCsrfCookieName?: string;
+}
 
 interface ApiErrorPayload {
   detail?: string;
@@ -70,6 +72,23 @@ function getCookieValue(name: string): string {
   return decodeURIComponent(matched.slice(prefix.length));
 }
 
+function getRuntimeConfig(): DashboardRuntimeConfig {
+  if (typeof window === "undefined") return {};
+  return (
+    (
+      window as Window & {
+        __DASHBOARD_RUNTIME_CONFIG__?: DashboardRuntimeConfig;
+      }
+    ).__DASHBOARD_RUNTIME_CONFIG__ ?? {}
+  );
+}
+
+function getAuthCsrfCookieName(): string {
+  const runtimeName = getRuntimeConfig().authCsrfCookieName?.trim();
+  if (runtimeName) return runtimeName;
+  return process.env.NEXT_PUBLIC_AUTH_CSRF_COOKIE_NAME || "dashboard_csrf";
+}
+
 function buildHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers);
   const apiKey = getStoredApiKey();
@@ -79,7 +98,7 @@ function buildHeaders(init?: RequestInit): Headers {
   // Always send CSRF token when available: some GET endpoints (e.g. env/profile) require it
   // because they use require_write_access for consistency.
   if (!headers.has("x-csrf-token")) {
-    const csrfToken = getCookieValue(AUTH_CSRF_COOKIE_NAME).trim();
+    const csrfToken = getCookieValue(getAuthCsrfCookieName()).trim();
     if (csrfToken) {
       headers.set("x-csrf-token", csrfToken);
     }

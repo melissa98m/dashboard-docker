@@ -109,6 +109,10 @@ Pré-requis `.env`:
 - `API_SECRET_KEY=<secret_long_aleatoire>`
 - `AUTH_ENABLED=true`
 
+Si plusieurs instances du dashboard tournent sur le meme hote ou domaine, donnez des valeurs
+uniques a `AUTH_SESSION_COOKIE_NAME` et `AUTH_CSRF_COOKIE_NAME` pour chaque instance. Les
+cookies navigateur ne sont pas isoles par port, ce qui peut provoquer des erreurs `Invalid CSRF token`.
+
 Reset OTP d'un utilisateur (ex: perte de téléphone):
 
 ```bash
