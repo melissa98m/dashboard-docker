@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: dashboard-api/Dockerfile
     container_name: dashboard-api
-    restart: unless-stopped
+    restart: always
     env_file:
       - .env
     volumes:
@@ -32,7 +32,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         API_UPSTREAM_URL: ${API_UPSTREAM_URL:-http://dashboard-api:8000}
     container_name: dashboard-web
-    restart: unless-stopped
+    restart: always
     env_file:
       - .env
     environment:
