@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.db.audit import (
+    count_audit_logs,
     count_purgeable_audit_logs,
     list_audit_logs,
     purge_audit_logs,
@@ -39,15 +40,43 @@ class PurgeAuditDryRunResponse(BaseModel):
     retention_days: int
 
 
-@router.get("/logs", response_model=list[AuditLogItem])
+class AuditLogListResponse(BaseModel):
+    items: list[AuditLogItem]
+    total: int
+    limit: int
+    offset: int
+
+
+@router.get("/logs", response_model=list[AuditLogItem] | AuditLogListResponse)
 def get_audit_logs(
     action: str | None = Query(default=None, min_length=1, max_length=100),
+    resource_type: str | None = Query(default=None, min_length=1, max_length=100),
+    triggered_by: str | None = Query(default=None, min_length=1, max_length=100),
+    q: str | None = Query(default=None, min_length=1, max_length=200),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    include_total: bool = Query(default=False),
     _actor: str = Depends(require_read_access),
 ):
-    """Read audit logs with optional filtering."""
-    return list_audit_logs(action=action, limit=limit, offset=offset)
+    """Read audit logs with optional filtering and pagination metadata."""
+    rows = list_audit_logs(
+        action=action,
+        resource_type=resource_type,
+        triggered_by=triggered_by,
+        query=q,
+        limit=limit,
+        offset=offset,
+    )
+    items = [AuditLogItem(**row) for row in rows]
+    if not include_total:
+        return items
+    total = count_audit_logs(
+        action=action,
+        resource_type=resource_type,
+        triggered_by=triggered_by,
+        query=q,
+    )
+    return AuditLogListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.post("/purge", response_model=PurgeAuditResponse)

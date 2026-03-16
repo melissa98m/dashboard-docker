@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { PaginationControls } from "@/app/components/pagination-controls";
 import { LogSnapshot } from "../../../components/log-snapshot";
-import { PaginationControls } from "../../../components/pagination-controls";
 import { apiJson, API_BASE_URL } from "../../../lib/api-client";
 
 interface ContainerDetail {
@@ -150,33 +150,47 @@ export default function ContainerLogsPage({
         </div>
       </div>
 
-      <section className="panel space-y-3">
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="md:col-span-2">
+      <section className="panel list-filters-panel">
+        <div className="list-filters-header">
+          <div>
+            <p className="list-filters-title">Explorer les logs</p>
+            <p className="list-filters-subtitle">
+              Filtre par source et recherche instantanée dans le buffer.
+            </p>
+          </div>
+          <span className="list-summary-badge">
+            {filteredEntries.length} ligne
+            {filteredEntries.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <div className="list-filters-grid">
+          <label className="list-field list-field--wide">
             <span className="field-label">Recherche</span>
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Chercher dans les lignes de log…"
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             />
           </label>
-          <label>
+          <label className="list-field">
             <span className="field-label">Source</span>
             <select
               value={sourceFilter}
               onChange={(event) =>
                 setSourceFilter(event.target.value as LogSourceFilter)
               }
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             >
               <option value="all">Snapshot + live</option>
               <option value="snapshot">Snapshot</option>
               <option value="live">Live</option>
             </select>
           </label>
-          <div className="flex items-end">
-            <p className="text-sm text-slate-400">
+          <div className="list-field list-field--summary">
+            <span className="field-label">Buffer</span>
+            <p className="list-summary-text">
               Snapshot: {snapshotEntries.length} ligne
               {snapshotEntries.length > 1 ? "s" : ""} · Live:{" "}
               {liveEntries.length} ligne{liveEntries.length > 1 ? "s" : ""}

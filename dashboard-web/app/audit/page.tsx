@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { PaginationControls } from "@/app/components/pagination-controls";
 import { useConfirm } from "../components/confirm-dialog";
 import { LogSnapshot, splitLogLines } from "../components/log-snapshot";
 import { useNotifications } from "../components/notifications";
-import { PaginationControls } from "../components/pagination-controls";
 import { apiFetch, apiJson } from "../lib/api-client";
 
 interface AuditLogItem {
@@ -147,9 +147,21 @@ export default function AuditPage() {
         </div>
       </div>
 
-      <section className="panel space-y-3">
-        <form onSubmit={onFilterSubmit} className="grid gap-3 md:grid-cols-2">
-          <label className="md:col-span-2">
+      <section className="panel list-filters-panel">
+        <div className="list-filters-header">
+          <div>
+            <p className="list-filters-title">Recherche et filtres</p>
+            <p className="list-filters-subtitle">
+              Combine texte libre, action, type de ressource et acteur.
+            </p>
+          </div>
+          <span className="list-summary-badge">
+            {total} entrée{total > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <form onSubmit={onFilterSubmit} className="list-filters-grid">
+          <label className="list-field list-field--wide">
             <span className="field-label">Recherche</span>
             <input
               value={filters.query}
@@ -160,11 +172,11 @@ export default function AuditPage() {
                 }))
               }
               placeholder="Action, ressource, acteur, détails…"
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             />
           </label>
 
-          <label>
+          <label className="list-field">
             <span className="field-label">Action</span>
             <input
               value={filters.action}
@@ -175,11 +187,11 @@ export default function AuditPage() {
                 }))
               }
               placeholder="ex: container_restart"
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             />
           </label>
 
-          <label>
+          <label className="list-field">
             <span className="field-label">Type de ressource</span>
             <input
               value={filters.resourceType}
@@ -190,11 +202,11 @@ export default function AuditPage() {
                 }))
               }
               placeholder="ex: container"
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             />
           </label>
 
-          <label>
+          <label className="list-field">
             <span className="field-label">Déclenché par</span>
             <input
               value={filters.triggeredBy}
@@ -205,11 +217,11 @@ export default function AuditPage() {
                 }))
               }
               placeholder="ex: admin"
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             />
           </label>
 
-          <label>
+          <label className="list-field">
             <span className="field-label">Purge (jours)</span>
             <input
               value={purgeDays}
@@ -220,47 +232,38 @@ export default function AuditPage() {
               type="number"
               min="1"
               max="3650"
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              className="list-input"
             />
           </label>
 
-          <div className="flex flex-wrap items-end gap-2 md:col-span-2">
-            <button
-              type="submit"
-              className="btn btn-primary rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium hover:bg-sky-500"
-            >
+          <div className="list-filter-actions">
+            <button type="submit" className="btn btn-primary">
               Rechercher
             </button>
             <button
               type="button"
               onClick={onResetFilters}
-              className="btn btn-neutral rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium hover:bg-slate-600"
+              className="btn btn-neutral"
             >
               Reinitialiser
             </button>
-            <button
-              type="button"
-              onClick={onDryRun}
-              className="btn btn-warn rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium hover:bg-amber-600"
-            >
+            <button type="button" onClick={onDryRun} className="btn btn-warn">
               Estimer
             </button>
-            <button
-              type="button"
-              onClick={onPurge}
-              className="btn btn-danger rounded-lg bg-red-700 px-4 py-2 text-sm font-medium hover:bg-red-600"
-            >
+            <button type="button" onClick={onPurge} className="btn btn-danger">
               Purger
             </button>
           </div>
         </form>
 
-        <div className="flex flex-col gap-2 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-          <p>
-            {total} entrée{total > 1 ? "s" : ""}
+        <div className="list-filters-footer">
+          <p className="list-summary-text">
+            Historique paginé avec compteur total renvoyé par l’API.
           </p>
           {purgeEstimate != null && (
-            <p>Dry-run: {purgeEstimate} ligne(s) seraient supprimées.</p>
+            <p className="list-summary-badge list-summary-badge--warn">
+              Dry-run: {purgeEstimate} ligne(s) seraient supprimées.
+            </p>
           )}
         </div>
 

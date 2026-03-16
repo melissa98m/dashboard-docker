@@ -6,6 +6,7 @@ import { apiJson, ApiClientError, apiFetch } from "./lib/api-client";
 import { useAuth } from "./contexts/auth-context";
 import { useConfirm } from "./components/confirm-dialog";
 import { useNotifications } from "./components/notifications";
+import { PaginationControls } from "@/app/components/pagination-controls";
 
 type StatusFilter = "all" | "running" | "exited";
 
@@ -44,6 +45,9 @@ export default function DashboardPage() {
     null
   );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
@@ -54,6 +58,7 @@ export default function DashboardPage() {
         const params = statusFilter === "all" ? "" : `?status=${statusFilter}`;
         const data = await apiJson<Container[]>(`/api/containers${params}`);
         setContainers(data);
+        setError(null);
         return data;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erreur");
@@ -72,7 +77,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [statusFilter]);
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery]);
 
   const action = async (id: string, action: "start" | "stop" | "restart") => {
     try {
@@ -112,11 +118,19 @@ export default function DashboardPage() {
   };
 
   const selectAll = () => {
-    if (selectedIds.size === containers.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(containers.map((c) => c.id)));
-    }
+    const visibleIds = paginatedContainers.map((container) => container.id);
+    const allVisibleSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   };
 
   const bulkStart = async () => {
@@ -262,6 +276,46 @@ export default function DashboardPage() {
     }
   };
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredContainers = containers.filter((container) => {
+    if (!normalizedSearch) return true;
+    return [
+      container.id,
+      container.name,
+      container.image,
+      container.status,
+      container.last_down_reason ?? "",
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedSearch);
+  });
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredContainers.length / pageSize)
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * pageSize;
+  const paginatedContainers = filteredContainers.slice(
+    pageStart,
+    pageStart + pageSize
+  );
+  const visibleSelectedCount = paginatedContainers.filter((container) =>
+    selectedIds.has(container.id)
+  ).length;
+  const canBulkStart = containers.some(
+    (c) => selectedIds.has(c.id) && c.status !== "running"
+  );
+  const canBulkStop = containers.some(
+    (c) => selectedIds.has(c.id) && c.status === "running"
+  );
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage);
+    }
+  }, [currentPage, safeCurrentPage]);
+
   if (loading)
     return (
       <main className="page-shell p-4 max-w-4xl mx-auto">
@@ -308,12 +362,6 @@ export default function DashboardPage() {
   };
 
   const selectedCount = selectedIds.size;
-  const canBulkStart = containers.some(
-    (c) => selectedIds.has(c.id) && c.status !== "running"
-  );
-  const canBulkStop = containers.some(
-    (c) => selectedIds.has(c.id) && c.status === "running"
-  );
 
   return (
     <main className="page-shell p-4 max-w-4xl mx-auto">
@@ -340,6 +388,53 @@ export default function DashboardPage() {
       </div>
 
       <div className="containers-controls">
+        <div className="list-filters-panel">
+          <div className="list-filters-header">
+            <div>
+              <p className="list-filters-title">Filtrer les conteneurs</p>
+              <p className="list-filters-subtitle">
+                Recherche rapide, statut et pagination de la liste.
+              </p>
+            </div>
+            <span className="list-summary-badge">
+              {filteredContainers.length} résultat
+              {filteredContainers.length > 1 ? "s" : ""}
+            </span>
+          </div>
+
+          <div className="list-filters-grid">
+            <label className="list-field list-field--wide">
+              <span className="field-label">Recherche</span>
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Nom, image, ID, statut, raison…"
+                className="list-input"
+              />
+            </label>
+            <div className="list-field list-field--summary">
+              <span className="field-label">Portée</span>
+              <p className="list-summary-text">
+                {filteredContainers.length !== containers.length
+                  ? `${filteredContainers.length} visibles sur ${containers.length}`
+                  : `${containers.length} visibles`}
+              </p>
+            </div>
+          </div>
+
+          <PaginationControls
+            total={filteredContainers.length}
+            page={safeCurrentPage}
+            pageSize={pageSize}
+            itemLabel="conteneur"
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(nextPageSize) => {
+              setPageSize(nextPageSize);
+              setCurrentPage(1);
+            }}
+          />
+        </div>
+
         <div
           className="status-tabs"
           role="tablist"
@@ -383,9 +478,10 @@ export default function DashboardPage() {
               onClick={selectAll}
               className="bulk-actions-select-all"
             >
-              {selectedCount === containers.length
-                ? "Tout désélectionner"
-                : "Tout sélectionner"}
+              {visibleSelectedCount === paginatedContainers.length &&
+              paginatedContainers.length > 0
+                ? "Désélectionner la page"
+                : "Sélectionner la page"}
             </button>
             <div className="bulk-actions-buttons">
               {canBulkStart && (
@@ -422,21 +518,23 @@ export default function DashboardPage() {
       </div>
 
       <ul id="containers-list" className="containers-list" role="tabpanel">
-        {containers.length === 0 ? (
+        {filteredContainers.length === 0 ? (
           <li className="empty-state">
             <span className="empty-state__icon" aria-hidden>
               📦
             </span>
             <p className="empty-state__text">
-              {statusFilter === "all"
-                ? "Aucun conteneur"
-                : statusFilter === "running"
-                  ? "Aucun conteneur en cours"
-                  : "Aucun conteneur arrêté"}
+              {normalizedSearch
+                ? "Aucun conteneur ne correspond à la recherche"
+                : statusFilter === "all"
+                  ? "Aucun conteneur"
+                  : statusFilter === "running"
+                    ? "Aucun conteneur en cours"
+                    : "Aucun conteneur arrêté"}
             </p>
           </li>
         ) : (
-          containers.map((c) => (
+          paginatedContainers.map((c) => (
             <li
               key={c.id}
               className={`container-card container-card--${
@@ -553,6 +651,18 @@ export default function DashboardPage() {
           ))
         )}
       </ul>
+
+      <PaginationControls
+        total={filteredContainers.length}
+        page={safeCurrentPage}
+        pageSize={pageSize}
+        itemLabel="conteneur"
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setCurrentPage(1);
+        }}
+      />
     </main>
   );
 }
