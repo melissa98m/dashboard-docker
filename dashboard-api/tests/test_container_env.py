@@ -1,6 +1,14 @@
 """Container env API tests."""
 
+import pytest
+
 from app.config import settings
+from app.services.container_env import (
+    detect_env_file,
+    merge_env,
+    parse_env_file,
+    write_env_file_atomic,
+)
 from tests.conftest import login_as_admin
 
 
@@ -73,6 +81,83 @@ class FakeDockerClient:
     def __init__(self, container: FakeContainer) -> None:
         self.containers = FakeContainerManager(container)
         self.api = FakeDockerApi()
+
+
+def test_parse_env_file_supports_quotes_comments_and_empty_values(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "# ignored comment\n"
+        "FOO=bar\n"
+        'QUOTED="value with spaces"\n'
+        "SINGLE='value'\n"
+        "EMPTY=\n"
+        "INVALID_LINE\n",
+        encoding="utf-8",
+    )
+
+    assert parse_env_file(env_file) == {
+        "FOO": "bar",
+        "QUOTED": "value with spaces",
+        "SINGLE": "value",
+        "EMPTY": "",
+    }
+
+
+def test_write_env_file_atomic_sorts_keys_and_ends_with_newline(tmp_path):
+    env_file = tmp_path / ".env"
+
+    write_env_file_atomic(env_file, {"ZETA": "last", "ALPHA": "first"})
+
+    assert env_file.read_text(encoding="utf-8") == "ALPHA=first\nZETA=last\n"
+
+
+def test_detect_env_file_deduplicates_candidates_and_returns_existing_file(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("FOO=bar\n", encoding="utf-8")
+    container = type(
+        "ContainerStub",
+        (),
+        {
+            "attrs": {
+                "Config": {
+                    "Labels": {
+                        "com.docker.compose.project.working_dir": str(tmp_path),
+                    }
+                },
+                "Mounts": [
+                    {
+                        "Source": str(tmp_path),
+                        "Destination": "/app",
+                    }
+                ],
+            }
+        },
+    )()
+
+    path, writable, candidates = detect_env_file(container)
+
+    assert path == str(env_file)
+    assert writable is True
+    assert candidates == [str(env_file)]
+
+
+def test_merge_env_replace_mode_discards_current_and_rejects_multiline_values():
+    merged = merge_env(
+        current={"OLD": "1", "KEEP": "x"},
+        updates={"NEW_VALUE": "2"},
+        unset=["KEEP"],
+        mode="replace",
+    )
+
+    assert merged == {"NEW_VALUE": "2"}
+
+    with pytest.raises(ValueError, match="Multiline env values"):
+        merge_env(
+            current={},
+            updates={"BROKEN": "line1\nline2"},
+            unset=[],
+            mode="merge",
+        )
 
 
 def test_get_env_profile_uses_runtime_env(client, monkeypatch):

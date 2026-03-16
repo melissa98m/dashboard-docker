@@ -34,7 +34,9 @@ export function LogSnapshot({
       <div className="log-snapshot-header">
         <div>
           <p className="font-semibold">{title}</p>
-          {subtitle ? <p className="log-snapshot-subtitle">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="log-snapshot-subtitle">{subtitle}</p>
+          ) : null}
         </div>
         <span className="log-snapshot-count">{countLabel}</span>
       </div>
@@ -51,7 +53,10 @@ export function LogSnapshot({
         ) : (
           <ol className="log-snapshot-lines">
             {lines.map((line, index) => (
-              <li key={`${index}-${line.slice(0, 24)}`} className="log-snapshot-line">
+              <li
+                key={`${index}-${line.slice(0, 24)}`}
+                className="log-snapshot-line"
+              >
                 <span className="log-snapshot-line-number" aria-hidden="true">
                   {index + 1}
                 </span>
