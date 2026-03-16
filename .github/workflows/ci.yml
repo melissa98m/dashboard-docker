@@ -68,7 +68,12 @@ jobs:
           file: ./dashboard-api/Dockerfile
           platforms: linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository }}/dashboard-api:latest
+          tags: |
+            ghcr.io/${{ github.repository }}/dashboard-api:latest
+            ghcr.io/${{ github.repository }}/dashboard-api:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -79,7 +84,12 @@ jobs:
           file: ./dashboard-web/Dockerfile
           platforms: linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository }}/dashboard-web:latest
+          tags: |
+            ghcr.io/${{ github.repository }}/dashboard-web:latest
+            ghcr.io/${{ github.repository }}/dashboard-web:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
           build-args: |
             NEXT_PUBLIC_API_URL=
             API_UPSTREAM_URL=http://dashboard-api:8000
@@ -121,7 +131,7 @@ jobs:
 
       - name: Deploy via SSH
         env:
-          IMAGE_API: ghcr.io/${{ github.repository }}/dashboard-api:latest
-          IMAGE_WEB: ghcr.io/${{ github.repository }}/dashboard-web:latest
+          IMAGE_API: ghcr.io/${{ github.repository }}/dashboard-api:sha-${{ github.sha }}
+          IMAGE_WEB: ghcr.io/${{ github.repository }}/dashboard-web:sha-${{ github.sha }}
         run: |
           ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e && cd $DEPLOY_PATH && [ -f .env ] || cp .env.production.example .env 2>/dev/null || cp .env.example .env && sed -i -e '/^[=[:space:]]*$/d' -e '/^# [=[:space:]]*$/d' .env && export COMPOSE_IMAGE_API=$IMAGE_API && export COMPOSE_IMAGE_WEB=$IMAGE_WEB && docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull && docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans"
