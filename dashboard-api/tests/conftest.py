@@ -13,6 +13,7 @@ os.environ["AUTH_ENABLED"] = "true"
 os.environ["ALERT_ENGINE_ENABLED"] = "false"
 os.environ["EVENT_WATCHER_ENABLED"] = "false"
 os.environ["AUDIT_RETENTION_AUTO_ENABLED"] = "false"
+os.environ["AUTH_SESSION_RETENTION_AUTO_ENABLED"] = "false"
 os.environ["COMMAND_EXECUTION_RETENTION_AUTO_ENABLED"] = "false"
 os.environ["API_SECRET_KEY"] = "test-secret-key-123"
 
