@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useEffect, useState } from "react";
+import { LogSnapshot } from "../../../components/log-snapshot";
 import { apiJson, API_BASE_URL } from "../../../lib/api-client";
 
 interface ContainerDetail {
@@ -93,17 +94,24 @@ export default function ContainerLogsPage({
       </div>
 
       <section className="panel">
-        <h2 className="font-semibold mb-2">Derniers logs (snapshot)</h2>
-        <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-64 overflow-auto">
-          {detail.last_logs.join("\n") || "Aucun log"}
-        </pre>
+        <LogSnapshot
+          lines={detail.last_logs}
+          title="Derniers logs (snapshot)"
+          subtitle="Capture récente exposée par l'API du conteneur."
+          emptyLabel="Aucun log"
+          maxHeightClassName="max-h-64"
+        />
       </section>
 
       <section className="panel">
-        <h2 className="font-semibold mb-2">Logs live (SSE)</h2>
-        <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-64 overflow-auto">
-          {streamLogs.join("\n") || "En attente de logs..."}
-        </pre>
+        <LogSnapshot
+          lines={streamLogs}
+          title="Logs live (SSE)"
+          subtitle="Flux temps réel du conteneur."
+          emptyLabel="En attente de logs..."
+          maxHeightClassName="max-h-64"
+          ariaLive="polite"
+        />
       </section>
     </main>
   );

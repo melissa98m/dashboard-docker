@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { LogSnapshot, splitLogLines } from "../../../components/log-snapshot";
 import { apiFetch, apiJson, API_BASE_URL } from "../../../lib/api-client";
 import { useAuth } from "../../../contexts/auth-context";
 
@@ -53,6 +54,10 @@ interface DiscoverResponse {
   discovered_count: number;
   cached: boolean;
   cache_age_seconds: number | null;
+}
+
+function prefixLines(channel: string, text: string): string[] {
+  return splitLogLines(text).map((line) => `[${channel}] ${line}`);
 }
 
 export function ContainerCommandsPanel({
@@ -213,6 +218,18 @@ export function ContainerCommandsPanel({
         new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
     );
   }, [executions]);
+
+  const renderedLiveLines = useMemo(() => {
+    return liveLines.map((line) => `[${line.channel}] ${line.text}`);
+  }, [liveLines]);
+
+  const snapshotLines = useMemo(() => {
+    if (!selectedDetail) return [];
+    return [
+      ...prefixLines("stdout", selectedDetail.stdout_tail),
+      ...prefixLines("stderr", selectedDetail.stderr_tail),
+    ];
+  }, [selectedDetail]);
 
   const runSpec = async (specId: number) => {
     try {
@@ -412,17 +429,27 @@ export function ContainerCommandsPanel({
           Exécution active : {selectedExecutionId ?? "aucune"} · état stream :{" "}
           {liveStatus}
         </p>
-        <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-48 overflow-auto mb-2">
-          {liveLines
-            .map((line) => `[${line.channel}] ${line.text}`)
-            .join("\n") || "Aucun flux live"}
-        </pre>
-        <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-48 overflow-auto">
-          {selectedDetail
-            ? `${selectedDetail.stdout_tail}\n${selectedDetail.stderr_tail}`.trim() ||
-              "Logs vides"
-            : "Sélectionne une exécution pour afficher le snapshot stdout/stderr"}
-        </pre>
+        <div className="space-y-2">
+          <LogSnapshot
+            lines={renderedLiveLines}
+            title="Flux live"
+            subtitle="stdout, stderr et événements de stream."
+            emptyLabel="Aucun flux live"
+            maxHeightClassName="max-h-48"
+            ariaLive="polite"
+          />
+          <LogSnapshot
+            lines={snapshotLines}
+            title="Snapshot stdout/stderr"
+            subtitle="Dernière sortie persistée pour l'exécution sélectionnée."
+            emptyLabel={
+              selectedDetail
+                ? "Logs vides"
+                : "Sélectionne une exécution pour afficher le snapshot stdout/stderr"
+            }
+            maxHeightClassName="max-h-48"
+          />
+        </div>
       </div>
     </section>
   );

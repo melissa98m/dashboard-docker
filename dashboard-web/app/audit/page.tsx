@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch, apiJson } from "../lib/api-client";
 import { useConfirm } from "../components/confirm-dialog";
+import { LogSnapshot, splitLogLines } from "../components/log-snapshot";
 import { useNotifications } from "../components/notifications";
 
 interface AuditLogItem {
@@ -197,9 +198,14 @@ export default function AuditPage() {
                 par {log.triggered_by} ·{" "}
                 {new Date(log.created_at).toLocaleString()}
               </p>
-              <pre className="code-panel text-xs text-slate-300 mt-2 whitespace-pre-wrap">
-                {JSON.stringify(log.details, null, 2)}
-              </pre>
+              <div className="mt-2">
+                <LogSnapshot
+                  title="Détails"
+                  lines={splitLogLines(JSON.stringify(log.details, null, 2))}
+                  emptyLabel="Aucun détail"
+                  maxHeightClassName="max-h-48"
+                />
+              </div>
             </li>
           ))}
         </ul>
