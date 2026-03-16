@@ -24,9 +24,11 @@ Le workflow `Branch CI` exécute à chaque `push` sur n'importe quelle branche e
 
 ## Deploy
 
-Après succès des tests, sur push uniquement vers `main` :
-1. SCP du projet vers le Raspberry Pi
-2. SSH : `docker compose build` (BuildKit désactivé pour compatibilité Pi) puis `docker compose up -d --remove-orphans`
+Apres succes des tests, sur push uniquement vers `main` :
+1. Build des images Docker pour `linux/arm64` sur GitHub Actions
+2. Push des images vers ghcr.io avec les tags `latest` et `sha-<commit>`
+3. Rsync du projet vers le Raspberry Pi
+4. SSH : `docker compose pull` puis `docker compose up -d --remove-orphans` avec les images `sha-<commit>`
 
 ## Auto Pull Request
 
@@ -83,10 +85,12 @@ Puis lancer un déploiement depuis GitHub Actions (onglet Actions → CI + Deplo
 
 ### Comportement du déploiement
 
-1. **Build sur CI** : images Docker construites pour `linux/arm64` sur GitHub Actions, poussées vers ghcr.io (évite le build Next.js sur le Pi, source de SIGSEGV par manque de RAM)
+1. **Build sur CI** : images Docker construites pour `linux/arm64` sur GitHub Actions, poussees vers ghcr.io (evite le build Next.js sur le Pi, source de SIGSEGV par manque de RAM)
 2. **Rsync** du code vers le Pi (`.env` est gitignored donc jamais envoyé)
 3. Si `.env` absent sur le Pi, copie depuis `.env.example`
-4. `docker compose pull` puis `docker compose up -d` (aucun build sur le Pi)
+4. `docker compose pull` puis `docker compose up -d` avec les images `sha-<commit>` (aucun build sur le Pi)
+
+**Important** : le deploiement ne tourne pas sur le code rsync seul. Les conteneurs executent l'image Docker publiee sur ghcr.io pour le commit deploye.
 
 **Repo privé** : si le dépôt est privé, les images ghcr.io sont privées. Ajouter le secret `GHCR_TOKEN` (PAT scope `read:packages`) et configurer le login Docker sur le Pi avant le pull.
 
