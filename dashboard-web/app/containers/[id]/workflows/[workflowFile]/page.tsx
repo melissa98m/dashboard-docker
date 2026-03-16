@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LogSnapshot } from "../../../../components/log-snapshot";
 import { apiJson, streamSsePost } from "../../../../lib/api-client";
 import { useAuth } from "../../../../contexts/auth-context";
 import { useNotifications } from "../../../../components/notifications";
@@ -32,7 +33,7 @@ export default function WorkflowDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [runningJob, setRunningJob] = useState<string | null>(null);
   const [output, setOutput] = useState<string[]>([]);
-  const outputRef = useRef<HTMLPreElement | null>(null);
+  const outputRef = useRef<HTMLDivElement | null>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
 
   const loadData = useCallback(async () => {
@@ -243,20 +244,14 @@ export default function WorkflowDetailPage({
 
       {output.length > 0 && (
         <section className="panel">
-          <h2 className="font-semibold mb-2">Sortie</h2>
-          <div className="terminal-block">
-            <div className="terminal-header">
-              <span className="terminal-dots">
-                <span className="bg-red-500/90" />
-                <span className="bg-amber-500/90" />
-                <span className="bg-emerald-500/90" />
-              </span>
-              <span className="terminal-label">Terminal</span>
-            </div>
-            <pre ref={outputRef} className="terminal-output">
-              {output.join("\n")}
-            </pre>
-          </div>
+          <LogSnapshot
+            lines={output}
+            title="Sortie"
+            subtitle="Terminal du job workflow en cours d'exécution."
+            maxHeightClassName="max-h-64"
+            viewportRef={outputRef}
+            ariaLive="polite"
+          />
         </section>
       )}
     </main>

@@ -419,6 +419,7 @@ export default function SettingsPage() {
     try {
       await apiJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enrollment_token: mfaSetup.enrollment_token,
           otp_code: mfaSetupCode.trim(),
@@ -453,6 +454,7 @@ export default function SettingsPage() {
     try {
       await apiJson<{ enabled: boolean }>("/api/auth/2fa/disable", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           password: mfaDisablePassword.trim(),
           otp_code: mfaDisableCode.trim(),

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { LogSnapshot } from "../../components/log-snapshot";
 import { apiJson, API_BASE_URL } from "../../lib/api-client";
 
 interface Execution {
@@ -36,7 +37,7 @@ function CommandsLiveContent() {
   const [liveFilter, setLiveFilter] = useState<"all" | LiveChannel>("all");
   const [copyFeedback, setCopyFeedback] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const liveOutputRef = useRef<HTMLPreElement | null>(null);
+  const liveOutputRef = useRef<HTMLDivElement | null>(null);
 
   const preselectedExecutionId = useMemo(() => {
     const value = searchParams.get("execution");
@@ -367,13 +368,15 @@ function CommandsLiveContent() {
             <span className="text-xs text-slate-400">{copyFeedback}</span>
           )}
         </div>
-        <pre
-          ref={liveOutputRef}
-          className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-64 overflow-auto"
-        >
-          {renderedLiveLines.join("\n") ||
-            "Aucun flux en temps reel pour le moment."}
-        </pre>
+        <LogSnapshot
+          lines={renderedLiveLines}
+          title="Flux live"
+          subtitle="stdout, stderr et événements système de l'exécution sélectionnée."
+          emptyLabel="Aucun flux en temps reel pour le moment."
+          maxHeightClassName="max-h-64"
+          viewportRef={liveOutputRef}
+          ariaLive="polite"
+        />
       </section>
     </main>
   );

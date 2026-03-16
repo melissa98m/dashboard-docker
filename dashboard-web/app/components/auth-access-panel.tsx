@@ -223,6 +223,7 @@ export default function AuthAccessPanel() {
     try {
       await apiJson<{ enabled: boolean }>("/api/auth/2fa/enable", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enrollment_token: totpSetup.enrollment_token,
           otp_code: totpEnableCode,

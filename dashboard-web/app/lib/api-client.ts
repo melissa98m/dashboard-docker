@@ -103,6 +103,13 @@ function buildHeaders(init?: RequestInit): Headers {
       headers.set("x-csrf-token", csrfToken);
     }
   }
+  if (
+    typeof init?.body === "string" &&
+    init.body.length > 0 &&
+    !headers.has("Content-Type")
+  ) {
+    headers.set("Content-Type", "application/json");
+  }
   return headers;
 }
 

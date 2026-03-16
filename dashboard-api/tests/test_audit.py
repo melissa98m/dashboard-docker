@@ -144,3 +144,60 @@ def test_write_audit_log_redacts_sensitive_detail_keys(client):
     assert details["api_key"] == "[REDACTED]"
     assert details["token"] == "[REDACTED]"
     assert details["password"] == "[REDACTED]"
+
+
+def test_list_audit_logs_supports_search_filters_and_total(client):
+    login_as_admin(client)
+    write_audit_log(
+        action="container_restart",
+        resource_type="container",
+        resource_id="redis-1",
+        triggered_by="alice",
+        details={"message": "Redis unhealthy threshold reached"},
+    )
+    write_audit_log(
+        action="volume_prune",
+        resource_type="volume",
+        resource_id="data-1",
+        triggered_by="bob",
+        details={"message": "Volume cleanup"},
+    )
+
+    response = client.get(
+        "/api/audit/logs"
+        "?include_total=true"
+        "&resource_type=container"
+        "&triggered_by=alice"
+        "&q=redis"
+        "&limit=10"
+        "&offset=0"
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["limit"] == 10
+    assert payload["offset"] == 0
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["action"] == "container_restart"
+    assert payload["items"][0]["resource_id"] == "redis-1"
+
+
+def test_list_audit_logs_supports_offset_pagination(client):
+    login_as_admin(client)
+    for resource_id in ("page-1", "page-2", "page-3"):
+        write_audit_log(
+            action="paged_action",
+            resource_type="container",
+            resource_id=resource_id,
+            triggered_by="pager",
+            details={},
+        )
+
+    response = client.get("/api/audit/logs?action=paged_action&include_total=true&limit=1&offset=1")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["limit"] == 1
+    assert payload["offset"] == 1
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["resource_id"] in {"page-1", "page-2", "page-3"}

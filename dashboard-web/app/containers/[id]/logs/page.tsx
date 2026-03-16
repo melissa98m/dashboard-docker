@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { PaginationControls } from "@/app/components/pagination-controls";
+import { LogSnapshot } from "../../../components/log-snapshot";
 import { apiJson, API_BASE_URL } from "../../../lib/api-client";
 
 interface ContainerDetail {
@@ -10,24 +12,40 @@ interface ContainerDetail {
   last_logs: string[];
 }
 
+type LogSourceFilter = "all" | "snapshot" | "live";
+
+interface LogEntry {
+  id: string;
+  source: Exclude<LogSourceFilter, "all">;
+  text: string;
+}
+
 export default function ContainerLogsPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const containerId = useMemo(() => params.id, [params.id]);
+  const containerId = params.id;
   const [detail, setDetail] = useState<ContainerDetail | null>(null);
   const [streamLogs, setStreamLogs] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<LogSourceFilter>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
+    setStreamLogs([]);
     const loadDetail = async () => {
       try {
         const data = await apiJson<ContainerDetail>(
           `/api/containers/${encodeURIComponent(containerId)}?tail=100`
         );
-        if (isMounted) setDetail(data);
+        if (isMounted) {
+          setDetail(data);
+          setError(null);
+        }
       } catch (e) {
         if (isMounted)
           setError(e instanceof Error ? e.message : "Erreur de chargement");
@@ -59,9 +77,49 @@ export default function ContainerLogsPage({
     };
   }, [containerId]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, sourceFilter]);
+
+  const snapshotEntries: LogEntry[] =
+    detail?.last_logs.map((line, index) => ({
+      id: `snapshot-${index}`,
+      source: "snapshot",
+      text: line,
+    })) ?? [];
+  const liveEntries: LogEntry[] = streamLogs.map((line, index) => ({
+    id: `live-${index}`,
+    source: "live",
+    text: line,
+  }));
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredEntries = [...snapshotEntries, ...liveEntries].filter(
+    (entry) => {
+      const matchesSource =
+        sourceFilter === "all" || entry.source === sourceFilter;
+      const matchesSearch =
+        !normalizedSearch ||
+        entry.text.toLowerCase().includes(normalizedSearch);
+      return matchesSource && matchesSearch;
+    }
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const paginatedEntries = filteredEntries.slice(
+    pageStart,
+    pageStart + pageSize
+  );
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [page, safePage]);
+
   if (error) {
     return (
-      <main className="page-shell p-4 max-w-4xl mx-auto">
+      <main className="page-shell mx-auto max-w-4xl p-4">
         <p className="text-red-400">Erreur: {error}</p>
       </main>
     );
@@ -72,7 +130,7 @@ export default function ContainerLogsPage({
   }
 
   return (
-    <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
+    <main className="page-shell mx-auto max-w-4xl space-y-4 p-4">
       <div className="page-header">
         <h1 className="page-title text-2xl font-bold">Logs · {detail.name}</h1>
         <div className="top-nav">
@@ -92,18 +150,92 @@ export default function ContainerLogsPage({
         </div>
       </div>
 
-      <section className="panel">
-        <h2 className="font-semibold mb-2">Derniers logs (snapshot)</h2>
-        <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-64 overflow-auto">
-          {detail.last_logs.join("\n") || "Aucun log"}
-        </pre>
+      <section className="panel list-filters-panel">
+        <div className="list-filters-header">
+          <div>
+            <p className="list-filters-title">Explorer les logs</p>
+            <p className="list-filters-subtitle">
+              Filtre par source et recherche instantanée dans le buffer.
+            </p>
+          </div>
+          <span className="list-summary-badge">
+            {filteredEntries.length} ligne
+            {filteredEntries.length > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <div className="list-filters-grid">
+          <label className="list-field list-field--wide">
+            <span className="field-label">Recherche</span>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Chercher dans les lignes de log…"
+              className="list-input"
+            />
+          </label>
+          <label className="list-field">
+            <span className="field-label">Source</span>
+            <select
+              value={sourceFilter}
+              onChange={(event) =>
+                setSourceFilter(event.target.value as LogSourceFilter)
+              }
+              className="list-input"
+            >
+              <option value="all">Snapshot + live</option>
+              <option value="snapshot">Snapshot</option>
+              <option value="live">Live</option>
+            </select>
+          </label>
+          <div className="list-field list-field--summary">
+            <span className="field-label">Buffer</span>
+            <p className="list-summary-text">
+              Snapshot: {snapshotEntries.length} ligne
+              {snapshotEntries.length > 1 ? "s" : ""} · Live:{" "}
+              {liveEntries.length} ligne{liveEntries.length > 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        <PaginationControls
+          total={filteredEntries.length}
+          page={safePage}
+          pageSize={pageSize}
+          itemLabel="ligne"
+          pageSizeOptions={[25, 50, 100]}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       </section>
 
-      <section className="panel">
-        <h2 className="font-semibold mb-2">Logs live (SSE)</h2>
-        <pre className="code-panel text-xs whitespace-pre-wrap text-slate-300 max-h-64 overflow-auto">
-          {streamLogs.join("\n") || "En attente de logs..."}
-        </pre>
+      <section className="panel space-y-3">
+        <LogSnapshot
+          lines={paginatedEntries.map(
+            (entry) => `[${entry.source}] ${entry.text}`
+          )}
+          title="Logs filtrés"
+          subtitle="Snapshot initial et buffer live SSE du conteneur."
+          emptyLabel="Aucune ligne de log"
+          maxHeightClassName="max-h-[32rem]"
+          ariaLive={sourceFilter === "live" ? "polite" : "off"}
+        />
+
+        <PaginationControls
+          total={filteredEntries.length}
+          page={safePage}
+          pageSize={pageSize}
+          itemLabel="ligne"
+          pageSizeOptions={[25, 50, 100]}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       </section>
     </main>
   );

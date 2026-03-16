@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { apiFetch, apiJson } from "../lib/api-client";
+import { PaginationControls } from "@/app/components/pagination-controls";
 import { useConfirm } from "../components/confirm-dialog";
+import { LogSnapshot, splitLogLines } from "../components/log-snapshot";
 import { useNotifications } from "../components/notifications";
+import { apiFetch, apiJson } from "../lib/api-client";
 
 interface AuditLogItem {
   id: number;
@@ -16,29 +18,67 @@ interface AuditLogItem {
   created_at: string;
 }
 
+interface AuditLogListResponse {
+  items: AuditLogItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+interface AuditFilters {
+  action: string;
+  resourceType: string;
+  triggeredBy: string;
+  query: string;
+}
+
+const defaultFilters: AuditFilters = {
+  action: "",
+  resourceType: "",
+  triggeredBy: "",
+  query: "",
+};
+
 export default function AuditPage() {
   const notify = useNotifications();
   const confirm = useConfirm();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
-  const [actionFilter, setActionFilter] = useState("");
-  const [limit, setLimit] = useState("100");
+  const [filters, setFilters] = useState<AuditFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<AuditFilters>(defaultFilters);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [purgeDays, setPurgeDays] = useState("90");
   const [purgeEstimate, setPurgeEstimate] = useState<number | null>(null);
 
-  const loadLogs = async (action?: string) => {
+  const loadLogs = async (
+    nextFilters: AuditFilters,
+    nextPage: number,
+    nextPageSize: number
+  ) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      params.set("limit", limit);
-      if (action && action.trim().length > 0) {
-        params.set("action", action.trim());
-      }
-      const data = await apiJson<AuditLogItem[]>(
+      const params = new URLSearchParams({
+        include_total: "true",
+        limit: String(nextPageSize),
+        offset: String((nextPage - 1) * nextPageSize),
+      });
+      if (nextFilters.action.trim())
+        params.set("action", nextFilters.action.trim());
+      if (nextFilters.resourceType.trim())
+        params.set("resource_type", nextFilters.resourceType.trim());
+      if (nextFilters.triggeredBy.trim())
+        params.set("triggered_by", nextFilters.triggeredBy.trim());
+      if (nextFilters.query.trim()) params.set("q", nextFilters.query.trim());
+
+      const data = await apiJson<AuditLogListResponse>(
         `/api/audit/logs?${params.toString()}`
       );
-      setLogs(data);
+      setLogs(data.items);
+      setTotal(data.total);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur");
@@ -48,13 +88,19 @@ export default function AuditPage() {
   };
 
   useEffect(() => {
-    loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void loadLogs(appliedFilters, page, pageSize);
+  }, [appliedFilters, page, pageSize]);
 
   const onFilterSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await loadLogs(actionFilter);
+    setPage(1);
+    setAppliedFilters({ ...filters });
+  };
+
+  const onResetFilters = () => {
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+    setPage(1);
   };
 
   const onPurge = async () => {
@@ -74,7 +120,7 @@ export default function AuditPage() {
       await apiFetch(`/api/audit/purge?days=${encodeURIComponent(purgeDays)}`, {
         method: "POST",
       });
-      await loadLogs(actionFilter);
+      await loadLogs(appliedFilters, page, pageSize);
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Erreur");
     }
@@ -92,7 +138,7 @@ export default function AuditPage() {
   };
 
   return (
-    <main className="page-shell p-4 max-w-4xl mx-auto space-y-4">
+    <main className="page-shell mx-auto max-w-4xl space-y-4 p-4">
       <div className="page-header">
         <h1 className="page-title text-2xl font-bold">Audit Log</h1>
         <div className="top-nav">
@@ -101,83 +147,140 @@ export default function AuditPage() {
         </div>
       </div>
 
-      <section className="panel">
-        <form
-          onSubmit={onFilterSubmit}
-          className="flex flex-wrap gap-2 items-end"
-        >
-          <div className="flex-1 min-w-[220px]">
-            <label className="block text-xs text-slate-400 mb-1">Action</label>
+      <section className="panel list-filters-panel">
+        <div className="list-filters-header">
+          <div>
+            <p className="list-filters-title">Recherche et filtres</p>
+            <p className="list-filters-subtitle">
+              Combine texte libre, action, type de ressource et acteur.
+            </p>
+          </div>
+          <span className="list-summary-badge">
+            {total} entrée{total > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <form onSubmit={onFilterSubmit} className="list-filters-grid">
+          <label className="list-field list-field--wide">
+            <span className="field-label">Recherche</span>
             <input
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
+              value={filters.query}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  query: event.target.value,
+                }))
+              }
+              placeholder="Action, ressource, acteur, détails…"
+              className="list-input"
+            />
+          </label>
+
+          <label className="list-field">
+            <span className="field-label">Action</span>
+            <input
+              value={filters.action}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  action: event.target.value,
+                }))
+              }
               placeholder="ex: container_restart"
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              className="list-input"
             />
-          </div>
-          <div className="w-[140px]">
-            <label className="block text-xs text-slate-400 mb-1">Limit</label>
+          </label>
+
+          <label className="list-field">
+            <span className="field-label">Type de ressource</span>
             <input
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-              type="number"
-              min="1"
-              max="500"
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              value={filters.resourceType}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  resourceType: event.target.value,
+                }))
+              }
+              placeholder="ex: container"
+              className="list-input"
             />
-          </div>
-          <button
-            type="submit"
-            className="btn btn-primary px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-sm font-medium"
-          >
-            Filtrer
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActionFilter("");
-              loadLogs("");
-            }}
-            className="btn btn-neutral px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium"
-          >
-            Reinitialiser
-          </button>
-          <div className="w-[150px]">
-            <label className="block text-xs text-slate-400 mb-1">
-              Purge (days)
-            </label>
+          </label>
+
+          <label className="list-field">
+            <span className="field-label">Déclenché par</span>
+            <input
+              value={filters.triggeredBy}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  triggeredBy: event.target.value,
+                }))
+              }
+              placeholder="ex: admin"
+              className="list-input"
+            />
+          </label>
+
+          <label className="list-field">
+            <span className="field-label">Purge (jours)</span>
             <input
               value={purgeDays}
-              onChange={(e) => setPurgeDays(e.target.value)}
+              onChange={(event) => {
+                setPurgeDays(event.target.value);
+                setPurgeEstimate(null);
+              }}
               type="number"
               min="1"
               max="3650"
-              className="w-full rounded bg-slate-900 px-3 py-2 border border-slate-700"
+              className="list-input"
             />
+          </label>
+
+          <div className="list-filter-actions">
+            <button type="submit" className="btn btn-primary">
+              Rechercher
+            </button>
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="btn btn-neutral"
+            >
+              Reinitialiser
+            </button>
+            <button type="button" onClick={onDryRun} className="btn btn-warn">
+              Estimer
+            </button>
+            <button type="button" onClick={onPurge} className="btn btn-danger">
+              Purger
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onDryRun}
-            className="btn btn-warn px-4 py-2 bg-amber-700 hover:bg-amber-600 rounded-lg text-sm font-medium"
-          >
-            Estimer
-          </button>
-          <button
-            type="button"
-            onClick={onPurge}
-            className="btn btn-danger px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm font-medium"
-          >
-            Purger
-          </button>
+        </form>
+
+        <div className="list-filters-footer">
+          <p className="list-summary-text">
+            Historique paginé avec compteur total renvoyé par l’API.
+          </p>
           {purgeEstimate != null && (
-            <p className="text-xs text-slate-300 w-full">
+            <p className="list-summary-badge list-summary-badge--warn">
               Dry-run: {purgeEstimate} ligne(s) seraient supprimées.
             </p>
           )}
-        </form>
+        </div>
+
+        <PaginationControls
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          itemLabel="entrée"
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       </section>
 
-      <section className="panel">
+      <section className="panel space-y-3">
         {loading && <p>Chargement…</p>}
         {error && <p className="text-red-400">Erreur: {error}</p>}
         {!loading && !error && logs.length === 0 && (
@@ -187,22 +290,39 @@ export default function AuditPage() {
           {logs.map((log) => (
             <li
               key={log.id}
-              className="entity-card bg-slate-900 border border-slate-700 rounded p-3 text-sm"
+              className="entity-card rounded border border-slate-700 bg-slate-900 p-3 text-sm"
             >
               <p className="font-medium">
                 {log.action} · {log.resource_type}
                 {log.resource_id ? `/${log.resource_id}` : ""}
               </p>
-              <p className="text-slate-400 text-xs mt-1">
+              <p className="mt-1 text-xs text-slate-400">
                 par {log.triggered_by} ·{" "}
                 {new Date(log.created_at).toLocaleString()}
               </p>
-              <pre className="code-panel text-xs text-slate-300 mt-2 whitespace-pre-wrap">
-                {JSON.stringify(log.details, null, 2)}
-              </pre>
+              <div className="mt-2">
+                <LogSnapshot
+                  title="Détails"
+                  lines={splitLogLines(JSON.stringify(log.details, null, 2))}
+                  emptyLabel="Aucun détail"
+                  maxHeightClassName="max-h-48"
+                />
+              </div>
             </li>
           ))}
         </ul>
+
+        <PaginationControls
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          itemLabel="entrée"
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       </section>
     </main>
   );

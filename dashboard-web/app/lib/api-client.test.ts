@@ -84,6 +84,20 @@ describe("api-client", () => {
       "dashboard_csrf_instance_b=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
   });
 
+  it("defaults string request bodies to application/json", async () => {
+    const fetchMock = vi.fn(async () => buildJsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/auth/2fa/enable", {
+      method: "POST",
+      body: JSON.stringify({ otp_code: "123456" }),
+    });
+
+    const options = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(options.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
   it("emits auth event and throws ApiClientError on unauthorized response", async () => {
     const listener = vi.fn();
     window.addEventListener(getAuthEventName(), listener as EventListener);

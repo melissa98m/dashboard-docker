@@ -1,7 +1,8 @@
 """Notifications service tests."""
 
 from app.config import settings
-from app.services.notifications import send_email_notification
+from app.services import notifications as notifications_module
+from app.services.notifications import send_email_notification, send_ntfy_notification
 
 
 def test_send_email_returns_false_when_not_configured():
@@ -56,3 +57,58 @@ def test_send_email_calls_resend_when_configured(monkeypatch):
             sys.modules["resend"] = prev_resend
         else:
             sys.modules.pop("resend", None)
+
+
+def test_send_ntfy_returns_false_when_not_configured(monkeypatch):
+    monkeypatch.setattr(settings, "ntfy_base_url", None)
+    monkeypatch.setattr(settings, "ntfy_topic", None)
+
+    assert send_ntfy_notification(title="Alert", message="Body") is False
+
+
+def test_send_ntfy_posts_expected_payload_and_action(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        status_code = 200
+
+    def fake_post(url, *, content, headers, timeout):
+        captured["url"] = url
+        captured["content"] = content
+        captured["headers"] = headers
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(settings, "ntfy_base_url", "https://ntfy.example.com/")
+    monkeypatch.setattr(settings, "ntfy_topic", "default-topic")
+    monkeypatch.setattr(notifications_module.httpx, "post", fake_post)
+
+    assert (
+        send_ntfy_notification(
+            title="CPU high",
+            message="Usage above threshold",
+            topic="custom-topic",
+            action_url="https://dashboard.example.com/restart",
+        )
+        is True
+    )
+    assert captured["url"] == "https://ntfy.example.com/custom-topic"
+    assert captured["content"] == b"Usage above threshold"
+    assert captured["timeout"] == 5.0
+    headers = captured["headers"]
+    assert isinstance(headers, dict)
+    assert headers["Title"] == "CPU high"
+    assert headers["Priority"] == "4"
+    assert "https://dashboard.example.com/restart" in headers["Actions"]
+
+
+def test_send_ntfy_returns_false_on_http_error(monkeypatch):
+    def fake_post(*args, **kwargs):
+        _ = (args, kwargs)
+        raise notifications_module.httpx.HTTPError("boom")
+
+    monkeypatch.setattr(settings, "ntfy_base_url", "https://ntfy.example.com")
+    monkeypatch.setattr(settings, "ntfy_topic", "dashboard")
+    monkeypatch.setattr(notifications_module.httpx, "post", fake_post)
+
+    assert send_ntfy_notification(title="Alert", message="Body") is False
